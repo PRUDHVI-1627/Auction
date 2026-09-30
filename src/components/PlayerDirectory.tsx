@@ -37,16 +37,16 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
   async function fetchPlayers() {
     const { data } = await supabase
       .from('players')
-      .select('*, sold_to:teams(name)')
+      .select('*, sold_to:teams(name, color, logo_url)')
       .order('queue_order', { ascending: true });
-    
+
     if (data) setPlayers(data as any);
     setLoading(false);
   }
 
   const filteredPlayers = players.filter(p => {
-    const matchesPos = activePosition === 'All Positions' || 
-      p.position === activePosition || 
+    const matchesPos = activePosition === 'All Positions' ||
+      p.position === activePosition ||
       (p.position && p.position.includes(activePosition)) ||
       (p.department && p.department.includes(activePosition));
     const matchesStatus = activeStatus === 'ALL' || p.status === activeStatus;
@@ -56,37 +56,39 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center text-primary font-black animate-pulse uppercase tracking-[0.4em]">
-        Loading Players
+      <div className="min-h-screen bg-base flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface text-white font-body selection:bg-primary selection:text-surface">
-      <header className="bg-black/80 backdrop-blur-xl sticky top-0 z-50 border-b border-white/5">
-        <div className="flex justify-between items-center w-full px-6 py-4 max-w-screen-2xl mx-auto">
-          <h1 className="font-headline font-black italic tracking-tighter text-3xl md:text-5xl lg:text-6xl text-white uppercase leading-none drop-shadow-2xl">
-            Vedam Football League
-          </h1>
+    <div className="min-h-screen bg-base text-ink font-sans">
+      <header className="bg-base/95 backdrop-blur-sm sticky top-0 z-50 border-b border-border">
+        <div className="flex items-center gap-2.5 w-full px-6 py-4 max-w-screen-2xl mx-auto">
+          <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="15" stroke="var(--color-accent)" strokeWidth="1.5" />
+            <path d="M16 8L17.85 13.54H23.7L18.93 16.96L20.78 22.5L16 19.08L11.22 22.5L13.07 16.96L8.3 13.54H14.15L16 8Z" fill="var(--color-accent)" />
+          </svg>
+          <span className="font-display font-semibold text-sm text-ink-muted">Vedam Football League</span>
         </div>
       </header>
 
-      <main className="max-w-screen-2xl mx-auto px-6 py-8 pb-32">
-        <section className="mb-12">
+      <main className="max-w-screen-2xl mx-auto px-6 py-10 pb-32">
+        <section className="mb-10">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h1 className="font-headline text-5xl md:text-7xl font-black tracking-tighter uppercase text-white mb-2">
-                Player <span className="text-primary italic">Directory</span>
+              <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight text-ink mb-2">
+                Player Directory
               </h1>
-              <p className="font-label text-white/40 uppercase tracking-widest">Scout your next legend in the arena</p>
+              <p className="text-ink-muted text-sm">Scout the pool before you enter the arena.</p>
             </div>
-            <div className="w-full md:w-96">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-primary transition-colors w-5 h-5" />
-                <input 
-                  className="w-full bg-surface-container-low border-none ring-1 ring-white/10 focus:ring-2 focus:ring-primary py-4 pl-12 pr-4 text-white font-label tracking-wide rounded-lg placeholder:text-white/20 transition-all" 
-                  placeholder="Search player name or ID..." 
+            <div className="w-full md:w-80">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
+                <input
+                  className="w-full h-11 bg-surface border border-border focus:border-accent rounded-lg pl-10 pr-4 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors"
+                  placeholder="Search players"
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -96,56 +98,54 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-10">
-          <div className="lg:col-span-7 flex flex-wrap gap-2">
-            <button 
-              onClick={() => setActivePosition('All Positions')}
-              className={cn("px-6 py-3 font-label font-bold uppercase text-xs tracking-widest rounded-lg transition-all", activePosition === 'All Positions' ? "bg-primary text-surface shadow-[0_0_15px_rgba(255,231,146,0.3)]" : "bg-surface-container-high hover:bg-surface-bright text-white/60")}
-            >All Positions</button>
+        <section className="flex flex-wrap items-center justify-between gap-4 mb-8">
+          <div className="flex flex-wrap gap-1.5">
             {[
+              { id: 'All Positions', label: 'All' },
               { id: 'GK', label: 'Goalkeeper' },
               { id: 'DEF', label: 'Defender' },
               { id: 'MID', label: 'Midfield' },
               { id: 'FWD', label: 'Forward' }
             ].map(pos => (
-              <button 
-                key={pos.id} 
+              <button
+                key={pos.id}
                 onClick={() => setActivePosition(pos.id)}
-                className={cn("px-6 py-3 font-label font-bold uppercase text-xs tracking-widest rounded-lg transition-all", activePosition === pos.id ? "bg-primary text-surface shadow-[0_0_15px_rgba(255,231,146,0.3)]" : "bg-surface-container-high hover:bg-surface-bright text-white/60")}
+                className={cn(
+                  "px-4 py-2 text-xs font-medium rounded-lg transition-colors",
+                  activePosition === pos.id ? "bg-accent text-accent-ink" : "bg-surface text-ink-muted hover:text-ink border border-border"
+                )}
               >
                 {pos.label}
               </button>
             ))}
           </div>
-          <div className="lg:col-span-5 flex flex-wrap justify-end gap-2">
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-              {['ALL', 'UPCOMING', 'LIVE', 'SOLD', 'UNSOLD'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setActiveStatus(status)}
-                  className={cn(
-                    "px-6 py-2.5 rounded-full text-[10px] font-black tracking-[0.2em] transition-all border uppercase whitespace-nowrap",
-                    activeStatus === status
-                      ? "bg-primary text-surface border-primary shadow-[0_0_20px_rgba(212,175,55,0.3)]"
-                      : "bg-white/5 text-white/40 border-white/10 hover:border-white/20"
-                  )}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
+          <div className="flex gap-1.5">
+            {['ALL', 'UPCOMING', 'LIVE', 'SOLD', 'UNSOLD'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setActiveStatus(status)}
+                className={cn(
+                  "px-3.5 py-2 rounded-lg text-[11px] font-medium uppercase tracking-wide transition-colors border",
+                  activeStatus === status
+                    ? "bg-ink text-base border-ink"
+                    : "bg-transparent text-ink-faint border-border hover:text-ink-muted"
+                )}
+              >
+                {status}
+              </button>
+            ))}
           </div>
         </section>
 
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {filteredPlayers.map(player => (
-            <PlayerCard key={player.id} player={player} />
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {filteredPlayers.map((player, index) => (
+            <PlayerCard key={player.id} player={player} index={index} />
           ))}
         </section>
         {filteredPlayers.length === 0 && !loading && (
           <div className="text-center py-24 col-span-full">
-            <p className="font-headline font-black italic uppercase text-4xl text-white/10 tracking-tighter mb-2">No Players Found</p>
-            <p className="font-label text-xs text-white/20 uppercase tracking-widest">Try adjusting your filters or search term</p>
+            <p className="font-display font-semibold text-xl text-ink-muted mb-1">No players found</p>
+            <p className="text-ink-faint text-sm">Try adjusting your filters or search term.</p>
           </div>
         )}
       </main>
@@ -153,64 +153,89 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
   );
 }
 
-function PlayerCard({ player }: { player: any; key?: string | number }) {
-  const tierClass = player.tier === 'GOLD' ? 'tier-gold-glow' : player.tier === 'SILVER' ? 'tier-silver-glow' : 'tier-bronze-glow';
-  const tierColor = player.tier === 'GOLD' ? 'bg-[#ffd700] text-surface' : player.tier === 'SILVER' ? 'bg-[#e0e0e0] text-surface' : 'bg-[#a0522d] text-white';
-  const gleamColor = player.tier === 'GOLD' ? '#ffd700' : player.tier === 'SILVER' ? '#e0e0e0' : '#a0522d';
+const TIER_COLOR: Record<string, string> = {
+  GOLD: '#d4af6a',
+  SILVER: '#a9b3cf',
+  BRONZE: '#b3713f',
+};
+
+function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: string | number }) {
+  const accentColor = player.sold_to?.color || TIER_COLOR[player.tier] || '#2f5fff';
+  const headlineValue = player.status === 'SOLD' ? player.sold_price : player.base_price;
+  const isSold = player.status === 'SOLD';
 
   return (
-    <motion.div 
-      whileHover={player.status !== 'SOLD' ? { scale: 1.05, y: -12 } : { scale: 1.02 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: Math.min(index, 20) * 0.03, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={!isSold ? { y: -4, transition: { type: 'spring', stiffness: 300, damping: 24 } } : {}}
       layout
       className={cn(
-        "group relative overflow-hidden bg-surface-container-highest rounded-xl cursor-pointer card-hover-gleam", 
-        tierClass,
-        player.status === 'SOLD' && 'grayscale-[0.5]'
+        "group relative overflow-hidden rounded-xl border border-border",
+        isSold && 'opacity-70'
       )}
-      style={{ '--gleam-color': gleamColor } as any}
+      style={{ backgroundColor: accentColor }}
     >
-      {(player.tier === 'GOLD' || player.tier === 'SILVER' || player.tier === 'BRONZE') && <div className="metallic-shine" />}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/50" />
+
       <div className="aspect-[3/4] relative overflow-hidden">
-        <img 
-          alt={player.name} 
-          className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500" 
+        <img
+          alt={player.name}
+          className="absolute inset-y-0 left-[16%] w-[68%] h-full object-cover object-top grayscale-[0.15] group-hover:grayscale-0 transition-all duration-500 drop-shadow-[0_8px_20px_rgba(0,0,0,0.5)]"
           src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'}
           referrerPolicy="no-referrer"
         />
-        
-        {player.status === 'SOLD' && (
-          <div className="sold-stamp">SOLD</div>
+
+        <div className="absolute inset-0 bg-gradient-to-t from-base via-base/20 to-transparent" />
+
+        {/* Top row: team badge + headline number */}
+        <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
+          {player.sold_to?.logo_url ? (
+            <img src={player.sold_to.logo_url} className="w-7 h-7 rounded object-cover border border-white/10 bg-base/60" />
+          ) : (
+            <div className="w-7 h-7 rounded flex items-center justify-center bg-base/60 border border-white/10">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+            </div>
+          )}
+          <div className="text-right">
+            <div className="tnum text-xl font-bold text-ink leading-none">{headlineValue}</div>
+            <div className="text-[9px] uppercase tracking-wide text-ink-faint mt-0.5">VFL</div>
+          </div>
+        </div>
+
+        {isSold && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-ink/60 text-ink px-4 py-1.5 rounded font-hype text-sm uppercase tracking-widest bg-base/60 backdrop-blur-sm">
+            Sold
+          </div>
         )}
 
-        <div className="absolute inset-0 player-card-gradient"></div>
-        <div className="absolute top-4 left-4 flex flex-col gap-1">
-          <div className={cn("px-2 py-1 text-[10px] font-bold font-label tracking-widest rounded", tierColor)}>
-            {player.tier === 'GOLD' ? '7' : player.tier === 'SILVER' ? '5' : '3'} PTS
-          </div>
-          <div className="bg-black/80 backdrop-blur-md px-2 py-1 text-[10px] font-bold font-label tracking-widest rounded">{player.position}</div>
-        </div>
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex items-center gap-2 mb-1">
-            {player.status === 'LIVE' && <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>}
-            <span className={cn("font-label text-[10px] uppercase font-bold tracking-widest", player.status === 'LIVE' ? 'text-error' : 'text-white/40')}>
-              {player.status === 'SOLD' ? (
-                <span className="text-primary">Sold to {player.sold_to?.name || 'Unknown Team'}</span>
-              ) : player.status === 'LIVE' ? (
-                'Currently Bidding'
-              ) : player.status === 'UPCOMING' ? (
-                'Upcoming'
-              ) : 'Unsold'}
-            </span>
-          </div>
-          <h3 className="font-headline text-2xl font-black uppercase tracking-tighter leading-none mb-1">{player.name}</h3>
-          <div className="flex justify-between items-end border-t border-white/10 pt-2 mt-2">
-            <div className="font-label text-xs text-white/40 uppercase tracking-widest">
-              {player.status === 'SOLD' ? 'Price' : 'Starting'}
+        {/* Bottom: name, position, stat footer */}
+        <div className="absolute bottom-0 left-0 right-0">
+          {player.status === 'LIVE' && (
+            <div className="flex items-center gap-1.5 px-3 mb-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+              <span className="text-[10px] uppercase font-medium tracking-wide text-danger">Bidding now</span>
             </div>
-            <div className={cn("font-label text-xl font-bold", player.status === 'SOLD' ? 'text-white' : 'text-primary')}>
-              {player.status === 'SOLD' ? player.sold_price : player.base_price} <span className="text-[10px]">VFL</span>
-            </div>
+          )}
+          <div className="px-3">
+            <h3 className="font-display text-base font-bold uppercase leading-tight text-ink truncate">{player.name}</h3>
+            <p className="text-[10px] font-medium uppercase tracking-wide mb-2" style={{ color: accentColor }}>
+              {player.position}{isSold && player.sold_to?.name ? ` · ${player.sold_to.name}` : ''}
+            </p>
+          </div>
+          <div className="grid grid-cols-4 border-t border-white/10 bg-base/70 backdrop-blur-sm">
+            {[
+              { label: 'Tier', value: player.tier?.slice(0, 3) },
+              { label: 'Year', value: player.year || '—' },
+              { label: 'Dept', value: (player.department || '—').slice(0, 4) },
+              { label: 'Status', value: player.status?.slice(0, 4) },
+            ].map((s) => (
+              <div key={s.label} className="px-1.5 py-2 text-center border-r border-white/5 last:border-r-0">
+                <div className="text-[8px] uppercase tracking-wide text-ink-faint leading-none mb-1">{s.label}</div>
+                <div className="text-[10px] font-semibold text-ink leading-none truncate">{s.value}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

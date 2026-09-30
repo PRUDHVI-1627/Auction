@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Play, Pause, SkipForward, History, Undo, 
-  PlusCircle, RotateCcw, Megaphone,
-  Bell, Wallet, Gavel, Ban, Loader2, ChevronRight
+import {
+  Play, Pause, SkipForward, RotateCcw, Megaphone,
+  Bell, Wallet, Gavel, Ban, Undo, ChevronRight, SquarePen, Check, X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -25,6 +24,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [manualAmount, setManualAmount] = useState<string>('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+  const [editSaleTeamId, setEditSaleTeamId] = useState<string>('');
+  const [editSalePrice, setEditSalePrice] = useState<string>('');
   const unsoldCount = finishedPlayers.filter((player) => player.status === 'UNSOLD').length;
 
   useEffect(() => {
@@ -60,7 +62,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
     return () => { supabase.removeChannel(sub); };
   }, [activePlayer?.id]);
-
 
   async function getAuthHeaders(): Promise<HeadersInit> {
     const { data: { session } } = await supabase.auth.getSession();
@@ -103,7 +104,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     setFinishedPlayers(data || []);
   }
 
-
   async function fetchPlayer(id: string) {
     const { data } = await supabase.from('players').select('*').eq('id', id).single();
     setActivePlayer(data);
@@ -137,8 +137,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Server returned ${response.status}`);
       }
-      
-      console.log('Auction Spotlight Active');
     } catch (err: any) {
       console.error('Error starting auction:', err);
       alert('Failed to start auction: ' + err.message);
@@ -168,7 +166,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         throw new Error(errorData.error || `Server returned ${response.status}`);
       }
 
-      console.log("🏆 SOLD");
       setActivePlayer(null);
       setBids([]);
     } catch (err: any) {
@@ -267,7 +264,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
     setIsProcessing(true);
     try {
-      // 6. Use the bidding API with override flag set to true (if supported by logic)
       const response = await fetch('/api/bids', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -311,7 +307,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       if (!response.ok) throw new Error(`Announcement failed with ${response.status}`);
 
       setAnnouncement('');
-      alert('Broadcast dispatched successfully!');
     } catch (err: any) {
       console.error('Error posting announcement:', err);
       alert('Broadcast failed: ' + err.message);
@@ -322,24 +317,72 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   async function updateUserRole(userId: string, role: string, teamId: string | null) {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ role, team_id: teamId })
-        .eq('id', userId);
-      
-      if (error) throw error;
+      const response = await fetch('/api/admin/update-user-role', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ userId, role, teamId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server returned ${response.status}`);
+      }
+
       fetchAllUsers();
-      alert('User permission updated');
     } catch (err: any) {
       alert('Update failed: ' + err.message);
     }
   }
 
-  async function handleResetAuction() {
-    if (!window.confirm("⚠️ DANGER: This will purge all bids and reset all player/team data. Continue?")) {
+  function startEditSale(player: any) {
+    setEditingSaleId(player.id);
+    setEditSaleTeamId(player.sold_to_team_id || '');
+    setEditSalePrice(String(player.sold_price ?? ''));
+  }
+
+  function cancelEditSale() {
+    setEditingSaleId(null);
+    setEditSaleTeamId('');
+    setEditSalePrice('');
+  }
+
+  async function saveEditSale() {
+    if (!editingSaleId || !editSaleTeamId || !editSalePrice) {
+      alert('Select a team and enter a price');
       return;
     }
-    if (!window.confirm("FINAL WARNING: Are you absolutely sure you want to reset the GLOBAL ARENA?")) {
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/admin/edit-sale', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({
+          playerId: editingSaleId,
+          teamId: editSaleTeamId,
+          price: Number(editSalePrice),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server returned ${response.status}`);
+      }
+
+      cancelEditSale();
+      fetchFinished();
+      fetchAllTeams();
+    } catch (err: any) {
+      alert('Edit failed: ' + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  async function handleResetAuction() {
+    if (!window.confirm("This will erase all bids and reset every player and team. Continue?")) {
+      return;
+    }
+    if (!window.confirm("This cannot be undone. Reset the entire auction?")) {
       return;
     }
 
@@ -352,8 +395,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
       if (!response.ok) throw new Error(`Reset failed with ${response.status}`);
 
-      alert('Arena Reset Complete! All systems at zero.');
-      window.location.reload(); 
+      window.location.reload();
     } catch (err: any) {
       console.error('Error resetting auction:', err);
       alert('Reset failed: ' + err.message);
@@ -362,373 +404,380 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-surface flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-base flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-surface text-white font-body selection:bg-primary selection:text-surface">
-      {/* Top Navigation */}
-      <header className="bg-black/80 backdrop-blur-xl sticky top-0 z-50 border-b border-white/5">
+    <div className="min-h-screen bg-base text-ink font-sans">
+      <header className="bg-base/95 backdrop-blur-sm sticky top-0 z-50 border-b border-border">
         <div className="flex justify-between items-center w-full px-6 py-4 max-w-screen-2xl mx-auto">
-          <div className="text-2xl font-black italic tracking-tighter text-primary font-headline text-glow uppercase">VFL Arena Ops</div>
-          <div className="flex items-center gap-4">
-             <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-2">
-                <div className={cn("w-2 h-2 rounded-full", session?.status === 'LIVE' ? "bg-emerald-500 animate-pulse" : "bg-white/20")}></div>
-                <span className="text-[10px] font-black uppercase tracking-widest">{session?.status || 'OFFLINE'}</span>
-             </div>
+          <span className="font-display font-semibold text-sm text-ink-muted">VFL Admin</span>
+          <div className="flex items-center gap-2 bg-surface border border-border px-3 py-1.5 rounded-full">
+            <div className={cn("w-1.5 h-1.5 rounded-full", session?.status === 'LIVE' ? "bg-success" : "bg-ink-faint")} />
+            <span className="text-[10px] font-medium uppercase tracking-wide text-ink-muted">{session?.status || 'Offline'}</span>
           </div>
         </div>
       </header>
 
       <main className="max-w-screen-2xl mx-auto p-6 lg:p-10 space-y-8">
-        {/* Command Controls */}
         <section className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-1">
-            <h1 className="text-5xl font-black font-headline tracking-tighter uppercase italic text-glow">Arena Ops</h1>
-            <p className="text-white/40 font-label text-[10px] uppercase tracking-[0.4em]">Draft Cycle Control Panel</p>
+          <div>
+            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-ink">Auction control</h1>
+            <p className="text-ink-muted text-sm mt-1">Run the draft cycle for every franchise.</p>
           </div>
-          <div className="flex flex-wrap gap-4">
-            <button 
+          <div className="flex flex-wrap gap-2.5">
+            <button
               onClick={togglePause}
               className={cn(
-                "border px-8 py-4 flex items-center gap-3 transition-all rounded-lg",
-                session?.status === 'PAUSED' ? "bg-emerald-500 border-emerald-500 text-surface" : "bg-surface-container-high border-white/10 hover:bg-surface-bright"
+                "px-5 py-2.5 flex items-center gap-2 transition-colors rounded-lg text-sm font-medium",
+                session?.status === 'PAUSED' ? "bg-success text-success-ink" : "bg-surface border border-border text-ink hover:border-border-strong"
               )}
             >
-              {session?.status === 'PAUSED' ? <Play className="w-5 h-5 fill-surface" /> : <Pause className="w-5 h-5 text-tertiary fill-tertiary" />}
-              <span className="font-headline font-bold uppercase tracking-tight text-sm">
-                {session?.status === 'PAUSED' ? 'Resume Hub' : 'Pause Hub'}
-              </span>
+              {session?.status === 'PAUSED' ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              {session?.status === 'PAUSED' ? 'Resume' : 'Pause'}
             </button>
-            <button 
+            <button
               onClick={handleResetAuction}
               disabled={isProcessing}
-              className="bg-error/5 border border-error/10 hover:bg-error hover:text-white px-8 py-4 flex items-center gap-3 transition-all rounded-lg group"
+              className="px-5 py-2.5 bg-danger/10 hover:bg-danger/20 text-danger flex items-center gap-2 transition-colors rounded-lg text-sm font-medium"
             >
-              <RotateCcw className={cn("w-5 h-5 text-error group-hover:text-white transition-colors", isProcessing && "animate-spin")} />
-              <span className="font-headline font-bold uppercase tracking-tight text-sm">
-                Global Reset
-              </span>
+              <RotateCcw className={cn("w-4 h-4", isProcessing && "animate-spin")} />
+              Reset
             </button>
-            <div className="h-12 w-px bg-white/10"></div>
-            <div className="flex gap-2 bg-white/5 p-1 rounded-xl">
-              {upcomingPlayers.length > 0 && (
-                <button 
-                  key={upcomingPlayers[0].id}
-                  disabled={isProcessing}
-                  onClick={() => startAuction(upcomingPlayers[0].id)}
-                  className="bg-primary hover:bg-primary-dim disabled:opacity-50 text-surface px-8 py-3 flex items-center gap-3 transition-all rounded-lg shadow-[0_0_20px_rgba(255,231,146,0.3)]"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <SkipForward className="w-4 h-4 fill-surface" />}
-                  <span className="font-label font-black uppercase text-xs tracking-widest">Call {upcomingPlayers[0].name}</span>
-                </button>
-              )}
-              {upcomingPlayers.length === 0 && unsoldCount > 0 && (
-                <button 
-                  disabled={isProcessing}
-                  onClick={() => startAuction()}
-                  className="bg-primary hover:bg-primary-dim disabled:opacity-50 text-surface px-8 py-3 flex items-center gap-3 transition-all rounded-lg shadow-[0_0_20px_rgba(255,231,146,0.3)]"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-                  <span className="font-label font-black uppercase text-xs tracking-widest">Start Re-Auction ({unsoldCount})</span>
-                </button>
-              )}
-            </div>
+            {upcomingPlayers.length > 0 && (
+              <button
+                disabled={isProcessing}
+                onClick={() => startAuction(upcomingPlayers[0].id)}
+                className="px-5 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-ink flex items-center gap-2 transition-colors rounded-lg text-sm font-medium"
+              >
+                <SkipForward className="w-4 h-4" />
+                Call {upcomingPlayers[0].name}
+              </button>
+            )}
+            {upcomingPlayers.length === 0 && unsoldCount > 0 && (
+              <button
+                disabled={isProcessing}
+                onClick={() => startAuction()}
+                className="px-5 py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-ink flex items-center gap-2 transition-colors rounded-lg text-sm font-medium"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Re-auction ({unsoldCount})
+              </button>
+            )}
           </div>
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Active Card */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Active player */}
           <div className="lg:col-span-4 space-y-6">
             {activePlayer ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+                className="bg-surface border border-border rounded-2xl overflow-hidden"
               >
-                <div className="p-8 flex items-center justify-between border-b border-white/10 bg-white/[0.02]">
-                  <div className="flex items-center gap-6">
-                    <img src={activePlayer.photo_url} className="w-24 h-24 rounded-2xl object-cover ring-2 ring-primary ring-offset-4 ring-offset-black/50" />
-                    <div>
-                      <h3 className="font-headline text-3xl font-black italic uppercase text-primary italic-bold">{activePlayer.name}</h3>
-                      <div className="flex gap-2 mt-2">
-                        <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">{activePlayer.position}</span>
-                        <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">BASE: {activePlayer.base_price} VFL</span>
-                      </div>
+                <div className="p-6 flex items-center gap-4 border-b border-border">
+                  <img src={activePlayer.photo_url} className="w-16 h-16 rounded-xl object-cover border border-border" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-display text-xl font-semibold text-ink truncate">{activePlayer.name}</h3>
+                    <div className="flex gap-1.5 mt-1.5">
+                      <span className="bg-surface-2 px-2 py-0.5 rounded text-[10px] text-ink-muted">{activePlayer.position}</span>
+                      <span className="bg-accent/10 text-accent px-2 py-0.5 rounded text-[10px]">{activePlayer.base_price} VFL</span>
                     </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Current High Bid</div>
-                    <div className="font-headline text-5xl font-black italic text-primary text-glow">{bids[0]?.amount || activePlayer.base_price}</div>
                   </div>
                 </div>
 
-                <div className="p-4 space-y-3 bg-white/5 backdrop-blur-3xl">
-                   <div className="grid grid-cols-2 gap-3">
-                     <button
+                <div className="p-6 border-b border-border">
+                  <div className="text-[10px] text-ink-faint uppercase tracking-wide mb-1">Current high bid</div>
+                  <div className="tnum text-4xl font-bold text-accent">{bids[0]?.amount || activePlayer.base_price}</div>
+                </div>
+
+                <div className="p-4 space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
                       onClick={handleSold}
                       disabled={bids.length === 0 || isProcessing}
-                      className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border border-emerald-500/20 p-5 rounded-2xl transition-all flex flex-col items-center gap-2 group disabled:opacity-20 disabled:cursor-not-allowed"
-                     >
-                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin text-emerald-500" /> : <Gavel className="w-6 h-6 group-hover:scale-110 transition-transform" />}
-                        <span className="font-black uppercase text-[10px] tracking-widest">Confirm Sale</span>
-                     </button>
-                     <button
+                      className="bg-success/10 hover:bg-success hover:text-success-ink text-success p-4 rounded-xl transition-colors flex flex-col items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Gavel className="w-5 h-5" />
+                      <span className="text-xs font-medium">Confirm sale</span>
+                    </button>
+                    <button
                       onClick={handleUnsold}
                       disabled={isProcessing}
-                      className="bg-error/10 hover:bg-error text-error hover:text-white border border-error/20 p-5 rounded-2xl transition-all flex flex-col items-center gap-2 group disabled:opacity-20"
-                     >
-                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin text-error" /> : <Ban className="w-6 h-6 group-hover:scale-110 transition-transform" />}
-                        <span className="font-black uppercase text-[10px] tracking-widest">Mark Unsold</span>
-                     </button>
-                   </div>
-                   <button
-                     onClick={handleStartTimer}
-                     disabled={isProcessing}
-                     className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 py-3 rounded-2xl transition-all flex items-center justify-center gap-2 group disabled:opacity-20"
-                   >
-                     <Play className="w-4 h-4 fill-primary group-hover:scale-110 transition-transform" />
-                     <span className="font-black uppercase text-[10px] tracking-widest">Start Timer (30s)</span>
-                   </button>
-                 </div>
+                      className="bg-danger/10 hover:bg-danger hover:text-danger-ink text-danger p-4 rounded-xl transition-colors flex flex-col items-center gap-1.5 disabled:opacity-30"
+                    >
+                      <Ban className="w-5 h-5" />
+                      <span className="text-xs font-medium">Mark unsold</span>
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleStartTimer()}
+                    disabled={isProcessing}
+                    className="w-full bg-surface-2 hover:bg-surface-3 text-ink py-3 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-30 text-xs font-medium"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    Start 30s timer
+                  </button>
+                </div>
               </motion.div>
             ) : (
-              <div className="aspect-[3/4] border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center text-center p-10 bg-white/[0.02]">
-                  <Gavel className="w-10 h-10 text-white/10 mb-4" />
-                  <p className="font-label text-xs uppercase tracking-widest text-white/20">No player in spotlight</p>
-                  <p className="font-label text-[9px] uppercase tracking-widest text-white/10 mt-2">Use "Call Player" above to start</p>
+              <div className="aspect-[3/4] border border-dashed border-border rounded-2xl flex flex-col items-center justify-center text-center p-10">
+                <Gavel className="w-8 h-8 text-ink-faint mb-3" />
+                <p className="text-sm text-ink-muted">No player in spotlight</p>
+                <p className="text-xs text-ink-faint mt-1">Call a player above to begin</p>
               </div>
             )}
           </div>
 
-          {/* Activity Log */}
+          {/* Bid sequence */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-             <div className="flex-1 bg-surface-container-low rounded-3xl border border-white/5 flex flex-col overflow-hidden max-h-[600px] shadow-inner">
-                <div className="p-6 border-b border-white/5 bg-white/5 flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                      <History className="w-5 h-5 text-primary" />
-                      <span className="font-headline font-black uppercase text-sm tracking-tight">Bid Sequence</span>
-                   </div>
-                   <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">Sync Active</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                   {bids.map((bid, index) => (
-                      <motion.div 
-                        initial={{ x: 20, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        key={bid.id} 
-                        className={cn(
-                          "flex justify-between items-center bg-white/5 p-4 rounded-xl border-l-4 shadow-lg",
-                          index === 0 ? "border-primary bg-primary/5" : "border-white/10"
-                        )}
+            <div className="flex-1 bg-surface rounded-2xl border border-border flex flex-col overflow-hidden max-h-[600px]">
+              <div className="p-5 border-b border-border">
+                <span className="text-sm font-medium text-ink">Bid sequence</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-2.5">
+                {bids.map((bid, index) => (
+                  <motion.div
+                    layout
+                    initial={{ x: 12, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ layout: { type: 'spring', stiffness: 300, damping: 28 } }}
+                    key={bid.id}
+                    className={cn(
+                      "flex justify-between items-center bg-surface-2 p-4 rounded-xl border-l-2",
+                      index === 0 ? "border-accent" : "border-border"
+                    )}
+                  >
+                    <div>
+                      <p className={cn("text-[10px] font-medium uppercase tracking-wide mb-1", index === 0 ? "text-accent" : "text-ink-faint")}>
+                        {index === 0 ? 'Highest bid' : 'Previous'}
+                      </p>
+                      <p className="tnum text-2xl font-semibold text-ink">{bid.amount} VFL</p>
+                      <p className="text-xs text-ink-muted">{bid.teams?.name || 'Unknown team'}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className={cn("px-2 py-0.5 rounded text-[9px] font-medium uppercase", index === 0 ? "bg-accent/15 text-accent" : "bg-surface-3 text-ink-faint")}>
+                        {index === 0 ? 'Leading' : 'Outbid'}
+                      </div>
+                      <p className="text-[10px] text-ink-faint mt-1.5">{new Date(bid.created_at).toLocaleTimeString()}</p>
+                    </div>
+                  </motion.div>
+                ))}
+                {bids.length === 0 && <div className="text-center py-16 text-ink-faint text-sm">Waiting for the opening bid</div>}
+              </div>
+              <div className="p-5 bg-surface-2 border-t border-border space-y-3">
+                {activePlayer && (
+                  <div className="p-3.5 bg-surface border border-border rounded-xl space-y-2.5">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">Manual override</p>
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedTeamId}
+                        onChange={(e) => setSelectedTeamId(e.target.value)}
+                        className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs text-ink focus:border-accent outline-none transition-colors"
                       >
-                         <div>
-                            <p className={cn("text-[10px] font-black uppercase mb-1", index === 0 ? "text-primary" : "text-white/40")}>
-                               {index === 0 ? '🏆 HIGHEST BID' : 'PREVIOUS BID'}
-                            </p>
-                            <p className="font-headline text-3xl font-black italic tracking-tighter text-white">{bid.amount} VFL</p>
-                            <p className="text-[10px] font-bold text-white/60 uppercase">{bid.teams?.name || 'Unknown Team'}</p>
-                         </div>
-                         <div className="text-right">
-                             <div className={cn("px-2 py-1 rounded text-[9px] font-black uppercase", index === 0 ? "bg-primary/20 text-primary" : "bg-white/5 text-white/20")}>
-                                {index === 0 ? 'Leading' : 'Outbid'}
-                             </div>
-                             <p className="text-[9px] text-white/20 mt-2">{new Date(bid.created_at).toLocaleTimeString()}</p>
-                         </div>
-                      </motion.div>
-                   ))}
-                   {bids.length === 0 && <div className="text-center py-20 text-white/10 font-black uppercase tracking-[0.5em] text-xs">Waiting for opening bid</div>}
-                </div>
-                <div className="p-6 bg-black/40 border-t border-white/5 space-y-4">
-                   {activePlayer && <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
-                      <p className="text-[10px] font-black uppercase text-primary tracking-widest">Marshall Override</p>
-                      <div className="flex gap-2">
-                         <select 
-                           value={selectedTeamId}
-                           onChange={(e) => setSelectedTeamId(e.target.value)}
-                           className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest focus:border-primary outline-none transition-all"
-                         >
-                            <option value="">Select Team</option>
-                            {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                         </select>
-                         <input 
-                           type="number"
-                           placeholder="Price"
-                           value={manualAmount}
-                           onChange={(e) => setManualAmount(e.target.value)}
-                           className="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-black placeholder:text-white/20 outline-none focus:border-primary transition-all text-center"
-                         />
-                         <button
-                           onClick={handleManualOverrideBid}
-                           disabled={isProcessing || !selectedTeamId || !manualAmount}
-                           className="bg-primary text-surface font-black px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest hover:brightness-110 disabled:opacity-20 transition-all"
-                         >
-                           Bid
-                         </button>
-                      </div>
-                   </div>}
+                        <option value="">Select team</option>
+                        {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Amount"
+                        value={manualAmount}
+                        onChange={(e) => setManualAmount(e.target.value)}
+                        className="w-24 bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-accent transition-colors text-center"
+                      />
+                      <button
+                        onClick={handleManualOverrideBid}
+                        disabled={isProcessing || !selectedTeamId || !manualAmount}
+                        className="bg-accent text-accent-ink font-medium px-4 py-2 rounded-lg text-xs hover:bg-accent-hover disabled:opacity-30 transition-colors"
+                      >
+                        Bid
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-                   <button 
-                    onClick={undoLastBid}
-                    disabled={bids.length === 0}
-                    className="w-full py-4 flex items-center justify-center gap-3 text-error bg-error/5 hover:bg-error hover:text-white border border-error/10 rounded-xl transition-all group disabled:opacity-20"
-                   >
-                      <Undo className="w-5 h-5 group-hover:-rotate-45 transition-transform" />
-                      <span className="font-black uppercase text-xs tracking-widest">Invert Last Call</span>
-                   </button>
-                </div>
-             </div>
-          </div>
-
-          {/* Auxiliary Ops */}
-          <div className="lg:col-span-3 space-y-6">
-
-             <div className="bg-surface-container p-6 rounded-3xl border border-white/5 space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                   <Megaphone className="w-4 h-4 text-primary" />
-                   <span className="font-black uppercase text-[10px] tracking-widest text-white/40">Global Feed</span>
-                </div>
-                <textarea 
-                  value={announcement}
-                  onChange={(e) => setAnnouncement(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-body italic focus:border-primary transition-all h-24 outline-none resize-none" 
-                  placeholder="Enter message for all portals..."
-                />
-                <button onClick={postAnnouncement} className="w-full bg-primary hover:bg-primary-dim text-surface font-black uppercase text-[10px] tracking-[0.2em] py-4 rounded-xl transition-all shadow-xl">
-                   Dispatch Broadcast
+                <button
+                  onClick={undoLastBid}
+                  disabled={bids.length === 0}
+                  className="w-full py-3 flex items-center justify-center gap-2 text-danger bg-danger/5 hover:bg-danger/10 rounded-lg transition-colors disabled:opacity-30 text-xs font-medium"
+                >
+                  <Undo className="w-4 h-4" />
+                  Undo last bid
                 </button>
-             </div>
-
-             <div className="bg-white/5 p-6 rounded-3xl border border-white/5 max-h-[300px] overflow-y-auto">
-                <h4 className="font-black uppercase text-[9px] tracking-widest text-primary mb-4 flex justify-between">
-                   <span>Auction Ledger</span>
-                   <span className="text-white/20">{finishedPlayers.length} Total</span>
-                </h4>
-                <div className="space-y-3">
-                   {finishedPlayers.map(p => (
-                      <div key={p.id} className="flex justify-between items-center group">
-                         <div className="flex flex-col">
-                            <span className="text-xs font-bold text-white uppercase">{p.name}</span>
-                            <span className={cn("text-[9px] font-black uppercase tracking-widest", p.status === 'SOLD' ? 'text-emerald-500' : 'text-error')}>
-                               {p.status === 'SOLD' ? `SOLD to ${p.teams?.name || (p as any).teams?.[0]?.name || 'Team'}` : 'UNSOLD'}
-                            </span>
-                         </div>
-                         <div className="text-right">
-                            <span className="text-xs font-headline font-black italic">{p.sold_price || '-'}</span>
-                         </div>
-                      </div>
-                   ))}
-                   {finishedPlayers.length === 0 && <p className="text-[9px] italic text-white/20 text-center py-4 uppercase">No players settled yet</p>}
-                </div>
-             </div>
-
-             <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                <h4 className="font-black uppercase text-[9px] tracking-widest text-white/20 mb-4">Upcoming Bench</h4>
-                <div className="space-y-3">
-                   {upcomingPlayers.slice(0, 5).map(p => (
-                      <div key={p.id} className="flex justify-between items-center group" title={p.position}>
-                         <span className="text-xs font-bold text-white/60 group-hover:text-white transition-colors uppercase">{p.name}</span>
-                         <span className="text-[9px] font-black uppercase text-white/20">{p.tier}</span>
-                      </div>
-                   ))}
-                </div>
-             </div>
+              </div>
+            </div>
           </div>
 
-          {/* User Pass Management */}
+          {/* Auxiliary */}
+          <div className="lg:col-span-3 space-y-6">
+            <div className="bg-surface p-5 rounded-2xl border border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <Megaphone className="w-4 h-4 text-accent" />
+                <span className="text-xs font-medium text-ink-muted">Broadcast</span>
+              </div>
+              <textarea
+                value={announcement}
+                onChange={(e) => setAnnouncement(e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-xl p-3 text-sm text-ink placeholder:text-ink-faint focus:border-accent transition-colors h-20 outline-none resize-none"
+                placeholder="Message for all portals"
+              />
+              <button onClick={postAnnouncement} className="w-full bg-accent hover:bg-accent-hover text-accent-ink font-medium text-sm py-2.5 rounded-lg transition-colors">
+                Send
+              </button>
+            </div>
+
+            <div className="bg-surface p-5 rounded-2xl border border-border max-h-[300px] overflow-y-auto">
+              <h4 className="text-xs font-medium text-ink-muted mb-4 flex justify-between">
+                <span>Ledger</span>
+                <span className="text-ink-faint">{finishedPlayers.length}</span>
+              </h4>
+              <div className="space-y-3">
+                {finishedPlayers.map(p => (
+                  <div key={p.id}>
+                    {editingSaleId === p.id ? (
+                      <div className="bg-surface-2 border border-border rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-medium text-ink">{p.name}</p>
+                        <div className="flex gap-1.5">
+                          <select
+                            value={editSaleTeamId}
+                            onChange={(e) => setEditSaleTeamId(e.target.value)}
+                            className="flex-1 bg-surface border border-border rounded-lg px-2 py-1.5 text-[11px] text-ink focus:border-accent outline-none transition-colors"
+                          >
+                            <option value="">Team</option>
+                            {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                          <input
+                            type="number"
+                            value={editSalePrice}
+                            onChange={(e) => setEditSalePrice(e.target.value)}
+                            className="w-16 bg-surface border border-border rounded-lg px-2 py-1.5 text-[11px] text-ink outline-none focus:border-accent transition-colors text-center"
+                          />
+                          <button
+                            onClick={saveEditSale}
+                            disabled={isProcessing}
+                            className="p-1.5 bg-success/10 text-success rounded-lg hover:bg-success hover:text-success-ink transition-colors disabled:opacity-40"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={cancelEditSale}
+                            className="p-1.5 bg-surface text-ink-faint rounded-lg hover:text-ink transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center group">
+                        <div>
+                          <span className="block text-sm text-ink">{p.name}</span>
+                          <span className={cn("text-[10px] uppercase tracking-wide", p.status === 'SOLD' ? 'text-success' : 'text-danger')}>
+                            {p.status === 'SOLD' ? `Sold to ${p.teams?.name || (p as any).teams?.[0]?.name || 'team'}` : 'Unsold'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="tnum text-sm text-ink-muted">{p.sold_price || '—'}</span>
+                          {p.status === 'SOLD' && (
+                            <button
+                              onClick={() => startEditSale(p)}
+                              className="p-1 text-ink-faint hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Correct this sale"
+                            >
+                              <SquarePen className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {finishedPlayers.length === 0 && <p className="text-xs text-ink-faint text-center py-4">Nothing settled yet</p>}
+              </div>
+            </div>
+
+            <div className="bg-surface p-5 rounded-2xl border border-border">
+              <h4 className="text-xs font-medium text-ink-muted mb-4">Upcoming bench</h4>
+              <div className="space-y-2.5">
+                {upcomingPlayers.slice(0, 5).map(p => (
+                  <div key={p.id} className="flex justify-between items-center" title={p.position}>
+                    <span className="text-sm text-ink truncate">{p.name}</span>
+                    <span className="text-[10px] text-ink-faint uppercase">{p.tier}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Access control */}
           <div className="lg:col-span-12">
-             <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
-                <div className="p-8 border-b border-white/10 bg-white/[0.02] flex justify-between items-center">
-                   <div>
-                      <h3 className="font-headline text-3xl font-black italic uppercase text-primary tracking-tight">Access Control</h3>
-                      <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mt-1">Assign Captains & Admins</p>
-                   </div>
-                   <button onClick={fetchAllUsers} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                      <RotateCcw className="w-5 h-5 text-white/20" />
-                   </button>
+            <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+              <div className="p-6 border-b border-border flex justify-between items-center">
+                <div>
+                  <h3 className="font-display text-xl font-semibold text-ink">Access control</h3>
+                  <p className="text-xs text-ink-faint mt-0.5">Assign captains and admins</p>
                 </div>
-                <div className="overflow-x-auto">
-                   <table className="w-full text-left border-collapse">
-                      <thead>
-                         <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-white/40">
-                            <th className="px-8 py-4">Identity</th>
-                            <th className="px-8 py-4">Current Role</th>
-                            <th className="px-8 py-4">Assigned Team</th>
-                            <th className="px-8 py-4 text-right">Action</th>
-                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                         {allUsers.map(u => (
-                            <tr key={u.id} className="hover:bg-white/[0.02] transition-colors group">
-                               <td className="px-8 py-6">
-                                  <div className="flex items-center gap-4">
-                                     <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-black text-primary text-xs overflow-hidden">
-                                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.email[0].toUpperCase()}
-                                     </div>
-                                     <div>
-                                        <div className="font-bold text-sm text-white uppercase">{u.name || 'Anonymous User'}</div>
-                                        <div className="text-[10px] text-white/40 font-mono tracking-tighter">{u.email}</div>
-                                     </div>
-                                  </div>
-                               </td>
-                               <td className="px-8 py-6 text-sm">
-                                  <select 
-                                     value={u.role}
-                                     onChange={(e) => {
-                                        const newRole = e.target.value;
-                                        updateUserRole(u.id, newRole, u.team_id);
-                                     }}
-                                     className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest focus:border-primary outline-none transition-all"
-                                  >
-                                     <option value="VIEWER">Viewer</option>
-                                     <option value="TEAM_OWNER">Captain</option>
-                                     <option value="ADMIN">Admin</option>
-                                  </select>
-                               </td>
-                               <td className="px-8 py-6 text-sm">
-                                  <select 
-                                     value={u.team_id || ''}
-                                     disabled={u.role !== 'TEAM_OWNER'}
-                                     onChange={(e) => {
-                                        const newTeamId = e.target.value || null;
-                                        updateUserRole(u.id, u.role, newTeamId);
-                                     }}
-                                     className={cn(
-                                        "bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest focus:border-primary outline-none transition-all",
-                                        u.role !== 'TEAM_OWNER' && "opacity-20 cursor-not-allowed"
-                                     )}
-                                  >
-                                     <option value="">No Team Assigned</option>
-                                     {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                  </select>
-                               </td>
-                               <td className="px-8 py-6 text-right">
-                                  <div className="flex justify-end gap-2 text-white/20">
-                                     <span className="text-[10px] font-black uppercase tracking-widest group-hover:text-primary transition-colors">Managed</span>
-                                  </div>
-                               </td>
-                            </tr>
-                         ))}
-                      </tbody>
-                   </table>
-                </div>
-             </div>
+                <button onClick={fetchAllUsers} className="p-2 hover:bg-surface-2 rounded-lg transition-colors">
+                  <RotateCcw className="w-4 h-4 text-ink-faint" />
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-[10px] font-medium uppercase tracking-wide text-ink-faint border-b border-border">
+                      <th className="px-6 py-3">Identity</th>
+                      <th className="px-6 py-3">Role</th>
+                      <th className="px-6 py-3">Team</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {allUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-surface-2/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-xs font-medium text-ink-muted overflow-hidden">
+                              {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.email[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="text-sm text-ink">{u.name || 'Anonymous'}</div>
+                              <div className="text-[11px] text-ink-faint">{u.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={u.role}
+                            onChange={(e) => updateUserRole(u.id, e.target.value, u.team_id)}
+                            className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-ink focus:border-accent outline-none transition-colors"
+                          >
+                            <option value="VIEWER">Viewer</option>
+                            <option value="TEAM_OWNER">Captain</option>
+                            <option value="ADMIN">Admin</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={u.team_id || ''}
+                            disabled={u.role !== 'TEAM_OWNER'}
+                            onChange={(e) => updateUserRole(u.id, u.role, e.target.value || null)}
+                            className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs text-ink focus:border-accent outline-none transition-colors disabled:opacity-30"
+                          >
+                            <option value="">No team</option>
+                            {allTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </main>
-
-      <footer className="fixed bottom-0 left-0 w-full bg-black/80 backdrop-blur-2xl border-t border-white/5 py-3 px-8 flex items-center z-[100]">
-         <div className="flex items-center gap-4 w-full">
-            <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
-            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-white/40 whitespace-nowrap">Broadcast Protocol Alpha Enabled</span>
-            <div className="w-px h-4 bg-white/10 mx-2"></div>
-            <div className="flex-1 overflow-hidden">
-               <div className="text-[10px] font-bold text-white uppercase tracking-widest marquee">
-                  SYSTEM STATUS: GREEN ::: TOTAL DATA SYNC: 99.8% ::: SESSION {session?.id?.slice(0,5)} RUNNING ::: 
-               </div>
-            </div>
-         </div>
-      </footer>
     </div>
   );
 }

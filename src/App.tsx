@@ -103,7 +103,11 @@ export default function App() {
   }
 
   const renderScreen = () => {
-    if (loading) return <div className="min-h-screen bg-surface flex items-center justify-center text-primary font-black animate-pulse uppercase tracking-[1em]">VFL Loading...</div>;
+    if (loading) return (
+      <div className="min-h-screen bg-base flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
+      </div>
+    );
 
     if (!user) return <LandingScreen onLogin={() => setCurrentScreen('directory')} />;
 
@@ -122,10 +126,9 @@ export default function App() {
         return <TeamSquads user={user} />;
       case 'watchlist':
         return (
-          <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 text-center px-6 pb-32">
-            <div className="text-6xl opacity-10">♥</div>
-            <h2 className="font-headline font-black italic uppercase text-3xl text-white/20 tracking-tighter">Watchlist</h2>
-            <p className="text-white/20 font-label text-xs uppercase tracking-widest">Coming soon — save players to follow them during the auction</p>
+          <div className="min-h-screen bg-base flex flex-col items-center justify-center gap-3 text-center px-6 pb-32">
+            <h2 className="font-display text-2xl font-semibold text-ink-muted">Watchlist coming soon</h2>
+            <p className="text-ink-faint text-sm max-w-xs">Save players to follow them during the auction.</p>
           </div>
         );
       default:
@@ -137,22 +140,19 @@ export default function App() {
     <div className="relative min-h-screen">
       <AnimatePresence>
         {announcement && (
-          <motion.div 
-            initial={{ y: -100, opacity: 0 }}
+          <motion.div
+            initial={{ y: -60, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            className="fixed top-0 left-0 right-0 z-[200] max-w-2xl mx-auto mt-4 px-4"
+            exit={{ y: -60, opacity: 0 }}
+            className="fixed top-4 left-0 right-0 z-[200] max-w-lg mx-auto px-4"
           >
-             <div className="bg-primary text-surface px-6 py-4 rounded-2xl flex items-center justify-between shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/20 backdrop-blur-md">
-                <div className="flex items-center gap-4 overflow-hidden">
-                   <div className="px-2 py-1 bg-surface text-primary text-[8px] font-black uppercase rounded shadow-inner animate-pulse">Live Feed</div>
-                   <p className="font-label font-bold text-sm uppercase tracking-wide truncate">{announcement.message}</p>
-                </div>
-                <button 
+             <div className="bg-accent text-accent-ink px-5 py-3.5 rounded-xl flex items-center justify-between gap-4 shadow-xl">
+                <p className="text-sm font-medium truncate">{announcement.message}</p>
+                <button
                   onClick={() => setAnnouncement(null)}
-                  className="hover:scale-110 transition-transform p-1 hover:bg-black/10 rounded-full"
+                  className="p-1 hover:bg-black/10 rounded-full transition-colors flex-shrink-0"
                 >
-                   <X className="w-5 h-5" />
+                   <X className="w-4 h-4" />
                 </button>
              </div>
           </motion.div>
