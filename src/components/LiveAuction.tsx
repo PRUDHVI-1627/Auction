@@ -173,8 +173,27 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-base flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
+    <div className="min-h-screen bg-base pb-28">
+      {/* Skeleton broadcast bar */}
+      <div className="bg-surface-2 border-b-2 border-danger/30 h-14 flex items-center px-5 sm:px-8 gap-4">
+        <div className="skeleton w-16 h-7 rounded-md" />
+        <div className="skeleton w-32 h-5" />
+      </div>
+      <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div className="lg:col-span-3 space-y-4">
+            <div className="skeleton h-48 rounded-xl" />
+            <div className="skeleton h-64 rounded-xl" />
+          </div>
+          <div className="lg:col-span-6 flex justify-center">
+            <div className="skeleton w-full max-w-[480px] aspect-[3.5/5] rounded-2xl" />
+          </div>
+          <div className="lg:col-span-3 space-y-4">
+            <div className="skeleton h-72 rounded-xl" />
+            <div className="skeleton h-48 rounded-xl" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -182,9 +201,9 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
   if (!activePlayer) {
     return (
       <div className="min-h-screen bg-base text-ink font-sans pb-28">
-        {/* Sky Sports style "BETWEEN ROUNDS" banner */}
-        <div className="bg-surface-2 border-b-2 border-accent">
-          <div className="max-w-screen-2xl mx-auto flex items-center justify-between px-5 sm:px-8 py-4">
+        {/* Broadcast bar — between rounds */}
+        <div className="bg-surface-2 border-b-2 border-accent grain relative">
+          <div className="relative z-[2] max-w-screen-2xl mx-auto flex items-center justify-between px-5 sm:px-8 py-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--color-accent)"><path d="M12 2L14.09 8.26L20.5 9.27L15.75 13.97L17.18 20.5L12 17.27L6.82 20.5L8.25 13.97L3.5 9.27L9.91 8.26L12 2Z" /></svg>
@@ -205,9 +224,9 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ type: 'spring', stiffness: 200, damping: 24 }}
             >
-              <h2 className="font-hype text-5xl md:text-6xl uppercase tracking-tight text-ink mb-2">
+              <h2 className="font-hype text-5xl md:text-6xl uppercase tracking-tighter text-ink mb-2">
                 Waiting for<br /><span className="text-accent">next player</span>
               </h2>
               <p className="text-ink-muted text-sm">The admin will spotlight the next name shortly.</p>
@@ -216,39 +235,41 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
         </div>
 
         <div className="max-w-6xl mx-auto px-5 sm:px-8 space-y-5">
-          {/* Budget ticker — horizontal league table style */}
+          {/* Budget ticker — double-bezel */}
           {allTeams.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="bg-surface-2 border border-border rounded-xl overflow-hidden"
+              transition={{ type: 'spring', stiffness: 200, damping: 26, delay: 0.05 }}
+              className="bezel"
             >
-              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Franchise Budgets</span>
-                <Wallet className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                {allTeams.map((t, i) => {
-                  const remaining = (t.total_budget || 100) - (t.points_spent || 0);
-                  const isMyTeam = userTeamId === t.id;
-                  return (
-                    <div key={t.id} className={cn(
-                      "px-4 py-3 border-b border-r border-border last:border-r-0 flex items-center gap-2.5",
-                      isMyTeam && "bg-accent/5"
-                    )}>
-                      {t.logo_url ? (
-                        <img src={t.logo_url} className="w-6 h-6 rounded object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-6 h-6 rounded flex-shrink-0" style={{ background: t.color || 'var(--color-accent)' }} />
-                      )}
-                      <div className="min-w-0">
-                        <span className="block text-[10px] text-ink-muted truncate">{t.name}</span>
-                        <span className={cn("tnum text-sm font-bold", isMyTeam ? "text-accent" : "text-ink")}>{remaining}</span>
+              <div className="bezel-inner overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Franchise Budgets</span>
+                  <Wallet className="w-3.5 h-3.5 text-accent" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                  {allTeams.map((t) => {
+                    const remaining = (t.total_budget || 100) - (t.points_spent || 0);
+                    const isMyTeam = userTeamId === t.id;
+                    return (
+                      <div key={t.id} className={cn(
+                        "px-4 py-3 border-b border-r border-border last:border-r-0 flex items-center gap-2.5 transition-colors",
+                        isMyTeam && "bg-accent/5"
+                      )}>
+                        {t.logo_url ? (
+                          <img src={t.logo_url} className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded flex-shrink-0" style={{ background: t.color || 'var(--color-accent)' }} />
+                        )}
+                        <div className="min-w-0">
+                          <span className="block text-[10px] text-ink-muted truncate">{t.name}</span>
+                          <span className={cn("tnum text-sm font-bold", isMyTeam ? "text-accent" : "text-ink")}>{remaining}</span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </motion.div>
           )}
@@ -259,11 +280,11 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15, duration: 0.4 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 26, delay: 0.1 }}
                 className="rounded-xl overflow-hidden border border-border"
               >
-                <div className="px-5 py-4" style={{ background: `linear-gradient(135deg, ${userTeam.color || 'var(--color-accent)'}, ${userTeam.color || 'var(--color-accent)'}88)` }}>
-                  <div className="flex items-center gap-3">
+                <div className="px-5 py-4 relative grain" style={{ background: `linear-gradient(135deg, ${userTeam.color || 'var(--color-accent)'}, ${userTeam.color || 'var(--color-accent)'}88)` }}>
+                  <div className="relative z-[2] flex items-center gap-3">
                     {userTeam.logo_url && <img src={userTeam.logo_url} className="w-10 h-10 rounded-lg border-2 border-white/20 bg-black/20 object-cover" />}
                     <div>
                       <h3 className="font-hype text-xl uppercase text-white">{userTeam.name}</h3>
@@ -293,25 +314,32 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-                className="bg-surface rounded-xl border border-border overflow-hidden"
+                transition={{ type: 'spring', stiffness: 200, damping: 26, delay: 0.15 }}
+                className="bezel"
               >
-                <div className="px-4 py-2.5 border-b border-border bg-surface-2">
-                  <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Recent decisions</h3>
-                </div>
-                <div className="p-4 space-y-1">
-                  {finishedPlayers.slice(0, 5).map(p => (
-                    <div key={p.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0">
-                      <div>
-                        <p className="text-sm font-medium text-ink leading-none mb-1">{p.name}</p>
-                        <p className={cn("text-[10px] font-bold uppercase tracking-widest", p.status === 'SOLD' ? 'text-success' : 'text-danger')}>
-                          {p.status === 'SOLD' ? (p.teams?.name || 'Franchise') : 'Unsold'}
-                        </p>
+                <div className="bezel-inner overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-border">
+                    <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Recent decisions</h3>
+                  </div>
+                  <div className="p-4 space-y-1">
+                    {finishedPlayers.slice(0, 5).map(p => (
+                      <div key={p.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0 hover:bg-surface-3/30 rounded transition-colors">
+                        <div>
+                          <p className="text-sm font-medium text-ink leading-none mb-1">{p.name}</p>
+                          <p className={cn("text-[10px] font-bold uppercase tracking-widest", p.status === 'SOLD' ? 'text-success' : 'text-danger')}>
+                            {p.status === 'SOLD' ? (p.teams?.name || 'Franchise') : 'Unsold'}
+                          </p>
+                        </div>
+                        <span className="tnum text-sm font-semibold text-ink-muted">{p.sold_price || '—'}</span>
                       </div>
-                      <span className="tnum text-sm font-semibold text-ink-muted">{p.sold_price || '—'}</span>
-                    </div>
-                  ))}
-                  {finishedPlayers.length === 0 && <p className="text-xs text-ink-faint text-center py-8">No results yet.</p>}
+                    ))}
+                    {finishedPlayers.length === 0 && (
+                      <div className="flex flex-col items-center py-8 gap-2">
+                        <Trophy className="w-5 h-5 text-ink-faint" />
+                        <p className="text-xs text-ink-faint">No results yet</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
 
@@ -319,27 +347,34 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25, duration: 0.4 }}
-                className="bg-surface rounded-xl border border-border overflow-hidden"
+                transition={{ type: 'spring', stiffness: 200, damping: 26, delay: 0.2 }}
+                className="bezel"
               >
-                <div className="px-4 py-2.5 border-b border-border bg-surface-2 flex items-center justify-between">
-                  <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Top sales</h3>
-                  <Trophy className="w-3.5 h-3.5 text-gold" />
-                </div>
-                <div className="p-4 space-y-1">
-                  {finishedPlayers.filter(p => p.status === 'SOLD').sort((a, b) => (b.sold_price || 0) - (a.sold_price || 0)).slice(0, 4).map((p, idx) => (
-                    <div key={p.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0">
-                      <div className="flex items-center gap-2.5">
-                        <span className={cn("tnum text-xs font-bold w-5 h-5 rounded flex items-center justify-center", idx === 0 ? "bg-gold/20 text-gold" : "bg-surface-2 text-ink-faint")}>{idx + 1}</span>
-                        <div>
-                          <p className="text-sm font-medium text-ink leading-none mb-1">{p.name}</p>
-                          <p className="text-[10px] text-ink-faint">{p.teams?.name}</p>
+                <div className="bezel-inner overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+                    <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Top sales</h3>
+                    <Trophy className="w-3.5 h-3.5 text-gold" />
+                  </div>
+                  <div className="p-4 space-y-1">
+                    {finishedPlayers.filter(p => p.status === 'SOLD').sort((a, b) => (b.sold_price || 0) - (a.sold_price || 0)).slice(0, 4).map((p, idx) => (
+                      <div key={p.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0 hover:bg-surface-3/30 rounded transition-colors">
+                        <div className="flex items-center gap-2.5">
+                          <span className={cn("tnum text-xs font-bold w-5 h-5 rounded flex items-center justify-center", idx === 0 ? "bg-gold/20 text-gold" : "bg-surface-2 text-ink-faint")}>{idx + 1}</span>
+                          <div>
+                            <p className="text-sm font-medium text-ink leading-none mb-1">{p.name}</p>
+                            <p className="text-[10px] text-ink-faint">{p.teams?.name}</p>
+                          </div>
                         </div>
+                        <span className={cn("tnum text-sm font-bold", idx === 0 ? "text-gold" : "text-accent")}>{p.sold_price}</span>
                       </div>
-                      <span className={cn("tnum text-sm font-bold", idx === 0 ? "text-gold" : "text-accent")}>{p.sold_price}</span>
-                    </div>
-                  ))}
-                  {finishedPlayers.filter(p => p.status === 'SOLD').length === 0 && <p className="text-xs text-ink-faint text-center py-8">No sales yet.</p>}
+                    ))}
+                    {finishedPlayers.filter(p => p.status === 'SOLD').length === 0 && (
+                      <div className="flex flex-col items-center py-8 gap-2">
+                        <Trophy className="w-5 h-5 text-ink-faint" />
+                        <p className="text-xs text-ink-faint">No sales yet</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -355,24 +390,21 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
 
   return (
     <div className="min-h-screen bg-base text-ink font-sans pb-28">
-      {/* === SKY SPORTS BROADCAST BAR === */}
-      <div className="sticky top-0 z-50 bg-surface-2 border-b-2 border-danger">
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between px-5 sm:px-8 h-14">
+      {/* === SKY SPORTS BROADCAST BAR with grain === */}
+      <div className="sticky top-0 z-50 bg-surface-2 border-b-2 border-danger grain relative">
+        <div className="relative z-[2] max-w-screen-2xl mx-auto flex items-center justify-between px-5 sm:px-8 h-14">
           <div className="flex items-center gap-4">
-            {/* Pulsing LIVE badge — prominent */}
             <div className="flex items-center gap-2 bg-danger px-4 py-1.5 rounded-md">
               <span className="w-2 h-2 rounded-full bg-white live-dot" />
               <span className="text-[11px] font-bold uppercase tracking-widest text-white">Live</span>
             </div>
             <div className="hidden sm:block w-px h-6 bg-border" />
             <h1 className="font-hype text-xl sm:text-2xl uppercase tracking-wide text-ink">{activePlayer.name}</h1>
-            {/* Tier badge */}
             <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ background: `${tierColor}20`, color: tierColor }}>
               {activePlayer.tier}
             </span>
           </div>
 
-          {/* Timer in broadcast bar when active */}
           <div className="flex items-center gap-4">
             {timeLeft !== null && (
               <motion.div
@@ -401,12 +433,17 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* LEFT — Player info + Bid log */}
           <div className="lg:col-span-3 space-y-4 order-2 lg:order-1">
-            {/* Player stats — PL stats card style */}
-            <div className="rounded-xl overflow-hidden border border-border">
-              <div className="px-4 py-3 bg-surface-2 border-b border-border">
-                <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Player profile</h3>
-              </div>
-              <div className="bg-surface">
+            {/* Player stats — double-bezel */}
+            <motion.div
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.05 }}
+              className="bezel"
+            >
+              <div className="bezel-inner overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Player profile</h3>
+                </div>
                 {[
                   { l: 'Position', v: activePlayer.department || activePlayer.position },
                   { l: 'Year', v: activePlayer.year || 'N/A' },
@@ -419,64 +456,81 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            {/* Bid log — scrollable */}
-            <div className="rounded-xl overflow-hidden border border-border max-h-[380px] flex flex-col">
-              <div className="px-4 py-3 bg-surface-2 border-b border-border flex justify-between flex-shrink-0">
-                <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Bid history</h3>
-                <span className="tnum text-[9px] font-bold text-ink-faint">{bids.length}</span>
-              </div>
-              <div className="p-3 space-y-1 overflow-y-auto bg-surface flex-1">
-                {bids.length > 0 ? bids.map((bid, i) => (
-                  <motion.div
-                    key={bid.id}
-                    layout
-                    initial={i === 0 ? { scale: 1.03, opacity: 0.8 } : false}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className={cn(
-                      "flex justify-between items-center px-3 py-2.5 rounded-lg",
-                      i === 0 ? "bg-accent/10 border border-accent/20" : "border border-transparent"
-                    )}
-                  >
-                    <div>
-                      <span className={cn("block text-[9px] font-bold uppercase tracking-widest", i === 0 ? "text-accent" : "text-ink-faint")}>
-                        {i === 0 ? 'Leading' : 'Outbid'}
-                      </span>
-                      <span className="text-sm text-ink">{bid.teams?.name || 'Team'}</span>
+            {/* Bid log — scrollable, double-bezel */}
+            <motion.div
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.1 }}
+              className="bezel max-h-[380px] flex flex-col"
+            >
+              <div className="bezel-inner overflow-hidden flex flex-col flex-1">
+                <div className="px-4 py-3 border-b border-border flex justify-between flex-shrink-0">
+                  <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Bid history</h3>
+                  <span className="tnum text-[9px] font-bold text-ink-faint">{bids.length}</span>
+                </div>
+                <div className="p-3 space-y-1 overflow-y-auto flex-1">
+                  {bids.length > 0 ? bids.map((bid, i) => (
+                    <motion.div
+                      key={bid.id}
+                      layout
+                      initial={i === 0 ? { scale: 1.03, opacity: 0.8 } : false}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+                      className={cn(
+                        "flex justify-between items-center px-3 py-2.5 rounded-lg",
+                        i === 0 ? "bg-accent/10 border border-accent/20" : "border border-transparent"
+                      )}
+                    >
+                      <div>
+                        <span className={cn("block text-[9px] font-bold uppercase tracking-widest", i === 0 ? "text-accent" : "text-ink-faint")}>
+                          {i === 0 ? 'Leading' : 'Outbid'}
+                        </span>
+                        <span className="text-sm text-ink">{bid.teams?.name || 'Team'}</span>
+                      </div>
+                      <span className={cn("tnum text-base font-bold", i === 0 ? "text-accent" : "text-ink-muted")}>{bid.amount}</span>
+                    </motion.div>
+                  )) : (
+                    <div className="flex flex-col items-center py-8 gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-surface-3 flex items-center justify-center">
+                        <Wallet className="w-4 h-4 text-ink-faint" />
+                      </div>
+                      <p className="text-xs text-ink-faint">No bids yet</p>
                     </div>
-                    <span className={cn("tnum text-base font-bold", i === 0 ? "text-accent" : "text-ink-muted")}>{bid.amount}</span>
-                  </motion.div>
-                )) : (
-                  <div className="text-center py-8 text-ink-faint text-xs">No bids yet</div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* CENTER — Player spotlight (UCL matchday graphic style) */}
-          <div className="lg:col-span-6 flex flex-col items-center justify-center order-1 lg:order-2">
+          {/* CENTER — Player spotlight (UCL matchday graphic) */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 24 }}
+            className="lg:col-span-6 flex flex-col items-center justify-center order-1 lg:order-2"
+          >
             <div className={cn(
-              "w-full max-w-[480px] aspect-[3.5/5] rounded-2xl overflow-hidden relative border-2 transition-all duration-500",
+              "w-full max-w-[480px] aspect-[3.5/5] rounded-2xl overflow-hidden relative border-2 transition-all duration-500 grain",
               (activePlayer.status === 'SOLD' || activePlayer.status === 'UNSOLD') && "opacity-50"
             )} style={{ borderColor: tierColor }}>
-              {/* Tier stripe at top */}
               <div className="absolute top-0 left-0 right-0 h-1 z-20" style={{ background: tierColor }} />
 
               <img
                 alt={activePlayer.name}
-                className="w-full h-full object-cover grayscale-[0.15]"
+                className="absolute inset-0 w-full h-full object-cover grayscale-[0.15]"
                 src={activePlayer.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'}
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
-              {/* SOLD / UNSOLD overlay — "DONE DEAL" style */}
+              {/* SOLD / UNSOLD overlay */}
               <AnimatePresence>
                 {(activePlayer.status === 'SOLD' || activePlayer.status === 'UNSOLD') && (
                   <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-[3px] overflow-hidden">
                     <motion.div
-                      initial={{ scale: 0.3, opacity: 0.7 }}
+                      initial={{ scale: 0.3, opacity: 0.8 }}
                       animate={{ scale: 2.5, opacity: 0 }}
                       transition={{ duration: 1.2, ease: 'easeOut' }}
                       className={cn("absolute w-40 h-40 rounded-full", activePlayer.status === 'SOLD' ? "bg-success" : "bg-danger")}
@@ -499,11 +553,10 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
               </AnimatePresence>
 
               {/* Bottom: name + scoreboard bid */}
-              <div className="absolute bottom-0 inset-x-0 p-6">
-                <h2 className="font-hype text-5xl lg:text-6xl text-white mb-5 uppercase tracking-wide drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
+              <div className="absolute bottom-0 inset-x-0 p-6 relative z-[2]">
+                <h2 className="font-hype text-5xl lg:text-6xl text-white mb-5 uppercase tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
                   {activePlayer.name}
                 </h2>
-                {/* Scoreboard-style current bid */}
                 <div className="flex items-end gap-6 bg-black/50 backdrop-blur-sm rounded-xl px-5 py-4 border border-white/10">
                   <div>
                     <span className="text-[9px] uppercase tracking-widest text-white/50 block mb-1">Base</span>
@@ -534,12 +587,17 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* RIGHT — Bid controls */}
           <div className="lg:col-span-3 space-y-4 order-3">
-            {/* Bid panel */}
-            <div className="rounded-xl overflow-hidden border-2 border-accent/30 bg-surface">
+            {/* Bid panel — double-bezel with accent border */}
+            <motion.div
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.05 }}
+              className="rounded-xl overflow-hidden border-2 border-accent/30 bg-surface"
+            >
               <div className="px-4 py-3 bg-accent/10 border-b border-accent/20">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-accent">
                   {userTeamId ? (bids.length === 0 ? 'Open bid' : isLeadingBid ? 'You lead' : 'Place your bid') : 'Spectator mode'}
@@ -559,7 +617,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                     <button
                       disabled={isBidding || session?.status !== 'LIVE'}
                       onClick={() => handleBid(1)}
-                      className="w-full bg-accent hover:bg-accent-hover text-accent-ink p-5 rounded-xl active:scale-[0.98] transition-all disabled:opacity-50"
+                      className="w-full bg-accent hover:bg-accent-hover text-accent-ink p-5 rounded-xl press transition-colors disabled:opacity-50 focus-ring"
                     >
                       <div className="flex flex-col items-center gap-1">
                         <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Open bid</span>
@@ -575,10 +633,10 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                           disabled={isBidding || session?.status !== 'LIVE' || !!isLeadingBid}
                           onClick={() => handleBid(inc)}
                           className={cn(
-                            "flex items-center justify-between p-3.5 rounded-xl border-2 transition-all disabled:opacity-35 disabled:cursor-not-allowed",
+                            "flex items-center justify-between p-3.5 rounded-xl border-2 transition-colors disabled:opacity-35 disabled:cursor-not-allowed focus-ring press",
                             isLeadingBid
                               ? "bg-success/5 border-success/20"
-                              : "bg-surface-2 hover:bg-surface-3 border-border hover:border-accent/40 active:scale-[0.98]"
+                              : "bg-surface-2 hover:bg-surface-3 border-border hover:border-accent/40"
                           )}
                         >
                           <div className="flex items-center gap-3">
@@ -610,43 +668,53 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
 
-            {/* Franchise budgets — compact */}
-            <div className="rounded-xl overflow-hidden border border-border bg-surface">
-              <div className="px-4 py-2.5 border-b border-border bg-surface-2">
-                <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Budgets</h3>
-              </div>
-              <div className="p-3 space-y-1">
-                {allTeams.map(t => {
-                  const remaining = (t.total_budget || 100) - (t.points_spent || 0);
-                  const pct = t.total_budget > 0 ? Math.min(100, ((t.points_spent || 0) / t.total_budget) * 100) : 0;
-                  return (
-                    <div key={t.id} className={cn(
-                      "px-3 py-2 rounded-lg",
-                      userTeamId === t.id ? "bg-accent/5" : ""
-                    )}>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] text-ink-muted truncate max-w-[100px]">{t.name}</span>
-                        <span className="tnum text-xs font-bold text-ink">{remaining}</span>
+            {/* Franchise budgets — compact, double-bezel */}
+            <motion.div
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.1 }}
+              className="bezel"
+            >
+              <div className="bezel-inner overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-border">
+                  <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Budgets</h3>
+                </div>
+                <div className="p-3 space-y-1">
+                  {allTeams.map(t => {
+                    const remaining = (t.total_budget || 100) - (t.points_spent || 0);
+                    const pct = t.total_budget > 0 ? Math.min(100, ((t.points_spent || 0) / t.total_budget) * 100) : 0;
+                    return (
+                      <div key={t.id} className={cn(
+                        "px-3 py-2 rounded-lg transition-colors",
+                        userTeamId === t.id ? "bg-accent/5" : "hover:bg-surface-3/30"
+                      )}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] text-ink-muted truncate max-w-[100px]">{t.name}</span>
+                          <span className="tnum text-xs font-bold text-ink">{remaining}</span>
+                        </div>
+                        <div className="h-1 bg-surface-2 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: t.color || 'var(--color-accent)' }} />
+                        </div>
                       </div>
-                      <div className="h-1 bg-surface-2 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: t.color || 'var(--color-accent)' }} />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </main>
 
-      {/* Outbid toast */}
+      {/* Outbid toast — spring entrance */}
       <AnimatePresence>
         {outbidToast && (
           <motion.div
-            initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }}
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 100, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
             className="fixed bottom-24 right-5 z-50 max-w-sm w-full"
           >
             <div className="bg-danger/10 border-2 border-danger/30 p-4 rounded-xl shadow-xl flex gap-3 items-start backdrop-blur-sm">
@@ -655,7 +723,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                 <span className="text-sm font-bold text-danger">OUTBID!</span>
                 <span className="block text-xs text-ink-muted mt-0.5">Another franchise raised on {activePlayer.name}.</span>
               </div>
-              <button onClick={() => setOutbidToast(false)} className="text-ink-faint hover:text-ink"><X className="w-4 h-4" /></button>
+              <button onClick={() => setOutbidToast(false)} className="text-ink-faint hover:text-ink press focus-ring rounded"><X className="w-4 h-4" /></button>
             </div>
           </motion.div>
         )}
@@ -672,30 +740,30 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
               className="relative w-full max-w-sm text-center"
             >
-              {/* Radiating ring */}
               <motion.div
                 initial={{ scale: 0.5, opacity: 0.8 }}
                 animate={{ scale: 3, opacity: 0 }}
                 transition={{ duration: 1.5, ease: 'easeOut' }}
                 className={cn("absolute inset-0 mx-auto my-auto w-32 h-32 rounded-full border-4", sellAnimation.type === 'SOLD' ? "border-success" : "border-danger")}
               />
-              <div className="relative bg-surface border-2 border-border p-10 rounded-2xl">
+              <div className="relative bg-surface border-2 border-border p-10 rounded-2xl grain">
                 <motion.span
                   initial={{ scale: 0.5, rotate: -12 }}
                   animate={{ scale: 1, rotate: -3 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 14 }}
                   className={cn(
-                    "inline-block px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest mb-5 border-2",
+                    "inline-block px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest mb-5 border-2 relative z-[2]",
                     sellAnimation.type === 'SOLD' ? "bg-success text-success-ink border-success" : "bg-danger text-danger-ink border-danger"
                   )}
                 >
                   {sellAnimation.type === 'SOLD' ? 'DONE DEAL' : 'UNSOLD'}
                 </motion.span>
-                <h2 className="font-hype text-4xl text-ink mb-3 uppercase">{sellAnimation.player.name}</h2>
+                <h2 className="font-hype text-4xl text-ink mb-3 uppercase relative z-[2]">{sellAnimation.player.name}</h2>
                 {sellAnimation.type === 'SOLD' && (
-                  <p className="tnum text-2xl font-bold text-accent">{sellAnimation.player.sold_price} VFL</p>
+                  <p className="tnum text-2xl font-bold text-accent relative z-[2]">{sellAnimation.player.sold_price} VFL</p>
                 )}
               </div>
             </motion.div>
