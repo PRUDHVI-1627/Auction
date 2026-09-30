@@ -127,10 +127,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   async function startAuction(playerId?: string) {
     setIsProcessing(true);
     try {
-      // 1. Call API for spotlighting player
       const response = await fetch('/api/auction/next-player', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify(playerId ? { playerId } : {})
       });
 
@@ -154,10 +153,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     setIsProcessing(true);
 
     try {
-      // 2. Call API for finalizing sale
       const response = await fetch('/api/auction/sell', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           playerId: activePlayer.id,
           teamId: latestBid.team_id,
@@ -185,10 +183,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (!activePlayer) return;
     setIsProcessing(true);
     try {
-      // 3. Call API for marking unsold
       const response = await fetch('/api/auction/unsold', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ playerId: activePlayer.id })
       });
 
