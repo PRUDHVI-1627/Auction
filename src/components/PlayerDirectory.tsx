@@ -12,7 +12,7 @@ interface PlayerDirectoryProps {
 export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activePosition, setActivePosition] = useState('All Positions');
+  const [activePosition, setActivePosition] = useState('All');
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -36,7 +36,7 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
   }
 
   const filteredPlayers = players.filter(p => {
-    const matchesPos = activePosition === 'All Positions' ||
+    const matchesPos = activePosition === 'All' ||
       p.position === activePosition ||
       (p.position && p.position.includes(activePosition)) ||
       (p.department && p.department.includes(activePosition));
@@ -55,111 +55,117 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
 
   const soldCount = players.filter(p => p.status === 'SOLD').length;
   const liveCount = players.filter(p => p.status === 'LIVE').length;
+  const upcomingCount = players.filter(p => p.status === 'UPCOMING').length;
 
   return (
     <div className="min-h-screen bg-base text-ink font-sans pb-28">
-      {/* === Hero header === */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-accent/[0.04] pattern-diagonal pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
-
-        <div className="relative max-w-screen-2xl mx-auto px-5 sm:px-8 pt-8 pb-10">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-7 h-7 rounded-full border-2 border-accent flex items-center justify-center">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-accent)">
-                <path d="M12 2L14.09 8.26L20.5 9.27L15.75 13.97L17.18 20.5L12 17.27L6.82 20.5L8.25 13.97L3.5 9.27L9.91 8.26L12 2Z" />
-              </svg>
-            </div>
-            <span className="font-hype text-base uppercase tracking-wider text-ink-muted">VFL</span>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <h1 className="font-hype text-5xl sm:text-6xl md:text-7xl leading-[0.85] tracking-tight uppercase mb-3">
-                Player<br /><span className="text-accent">Directory</span>
-              </h1>
-              <div className="flex items-center gap-4 text-sm text-ink-muted">
-                <span>{players.length} total</span>
-                <span className="w-1 h-1 rounded-full bg-border" />
-                <span className="text-success">{soldCount} sold</span>
-                {liveCount > 0 && (
-                  <>
-                    <span className="w-1 h-1 rounded-full bg-border" />
-                    <span className="text-danger flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-danger live-dot" />
-                      {liveCount} live
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="w-full md:w-72">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-                <input
-                  className="w-full h-10 bg-surface border border-border focus:border-accent rounded-lg pl-9 pr-4 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors"
-                  placeholder="Search players..."
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
+      {/* === BOLD ACCENT HERO === */}
+      <div className="relative bg-accent clip-slant-br">
+        <div className="absolute inset-0 pattern-diagonal opacity-30 pointer-events-none" />
+        <div className="relative max-w-screen-2xl mx-auto px-5 sm:px-8 pt-10 pb-16">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <span className="inline-block text-[10px] font-bold uppercase tracking-[0.25em] text-white/60 mb-3">VFL Draft Pool</span>
+            <h1 className="font-hype text-6xl sm:text-7xl md:text-8xl leading-[0.85] tracking-tight uppercase text-white">
+              Player<br />Directory
+            </h1>
+          </motion.div>
         </div>
       </div>
 
-      {/* === Filters === */}
-      <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1.5">
+      {/* === SCOREBOARD STATS BAR === */}
+      <div className="relative -mt-8 z-10 max-w-screen-2xl mx-auto px-5 sm:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-surface-2 border border-border rounded-xl overflow-hidden scoreboard-shimmer"
+        >
+          <div className="grid grid-cols-4 divide-x divide-border">
             {[
-              { id: 'All Positions', label: 'All' },
-              { id: 'GK', label: 'GK' },
-              { id: 'DEF', label: 'DEF' },
-              { id: 'MID', label: 'MID' },
-              { id: 'FWD', label: 'FWD' },
-            ].map(pos => (
+              { label: 'Total Pool', value: players.length, color: 'text-ink' },
+              { label: 'Sold', value: soldCount, color: 'text-success' },
+              { label: 'Live Now', value: liveCount, color: 'text-danger' },
+              { label: 'Upcoming', value: upcomingCount, color: 'text-ink-muted' },
+            ].map((stat) => (
+              <div key={stat.label} className="px-4 py-4 sm:px-6 sm:py-5 text-center">
+                <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-1">{stat.label}</span>
+                <span className={cn("tnum text-2xl sm:text-4xl font-bold leading-none", stat.color)}>
+                  {stat.value}
+                </span>
+                {stat.label === 'Live Now' && liveCount > 0 && (
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger live-dot ml-1.5 -translate-y-3" />
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* === SEARCH + FILTERS === */}
+      <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 pt-8 pb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-0 bg-surface-2 rounded-lg p-1 border border-border">
+            {['All', 'GK', 'DEF', 'MID', 'FWD'].map(pos => (
               <button
-                key={pos.id}
-                onClick={() => setActivePosition(pos.id)}
+                key={pos}
+                onClick={() => setActivePosition(pos)}
                 className={cn(
-                  "px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wide",
-                  activePosition === pos.id
-                    ? "bg-accent text-accent-ink"
-                    : "bg-surface text-ink-faint hover:text-ink border border-border"
+                  "px-4 py-2 text-xs font-bold rounded-md transition-all uppercase tracking-wider",
+                  activePosition === pos
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-ink-faint hover:text-ink"
                 )}
               >
-                {pos.label}
+                {pos}
               </button>
             ))}
           </div>
 
-          <div className="flex gap-1">
-            {['ALL', 'UPCOMING', 'LIVE', 'SOLD', 'UNSOLD'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setActiveStatus(status)}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all border",
-                  activeStatus === status
-                    ? status === 'LIVE'
-                      ? "bg-danger/10 text-danger border-danger/30"
-                      : status === 'SOLD'
-                        ? "bg-success/10 text-success border-success/30"
-                        : "bg-ink/10 text-ink border-ink/20"
-                    : "bg-transparent text-ink-faint border-transparent hover:text-ink-muted"
-                )}
-              >
-                {status}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex gap-1">
+              {[
+                { id: 'ALL', color: '' },
+                { id: 'UPCOMING', color: '' },
+                { id: 'LIVE', color: 'danger' },
+                { id: 'SOLD', color: 'success' },
+                { id: 'UNSOLD', color: '' },
+              ].map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveStatus(s.id)}
+                  className={cn(
+                    "px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all",
+                    activeStatus === s.id
+                      ? s.color === 'danger' ? "bg-danger text-white"
+                        : s.color === 'success' ? "bg-success text-black"
+                        : "bg-ink/15 text-ink"
+                      : "text-ink-faint hover:text-ink-muted"
+                  )}
+                >
+                  {s.id}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative flex-1 sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
+              <input
+                className="w-full h-9 bg-surface border border-border focus:border-accent rounded-lg pl-9 pr-4 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors"
+                placeholder="Search..."
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* === Card grid === */}
+      {/* === CARD GRID === */}
       <div className="max-w-screen-2xl mx-auto px-5 sm:px-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredPlayers.map((player, index) => (
@@ -169,7 +175,7 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
 
         {filteredPlayers.length === 0 && !loading && (
           <div className="text-center py-24">
-            <p className="font-hype text-2xl text-ink-muted uppercase mb-2">No players found</p>
+            <p className="font-hype text-3xl text-ink-muted uppercase mb-2">No players found</p>
             <p className="text-ink-faint text-sm">Adjust your filters or search term.</p>
           </div>
         )}
@@ -203,18 +209,14 @@ function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: 
       style={{ backgroundColor: teamColor }}
     >
       <div className="aspect-[3/4] relative overflow-hidden">
-        {/* Team color shows as side bands behind narrower photo */}
         <img
           alt={player.name}
           className="absolute inset-y-0 left-[14%] w-[72%] h-full object-cover object-top grayscale-[0.1] group-hover:grayscale-0 transition-all duration-500 drop-shadow-[0_6px_16px_rgba(0,0,0,0.5)]"
           src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'}
           referrerPolicy="no-referrer"
         />
-
-        {/* Overlay gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/20" />
 
-        {/* Top: badge + price */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between">
           {player.sold_to?.logo_url ? (
             <img src={player.sold_to.logo_url} className="w-7 h-7 rounded object-cover border border-white/20 bg-black/40" />
@@ -229,7 +231,6 @@ function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: 
           </div>
         </div>
 
-        {/* Live badge */}
         {isLive && (
           <div className="absolute top-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-danger/90 backdrop-blur-sm px-2.5 py-1 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" />
@@ -237,7 +238,6 @@ function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: 
           </div>
         )}
 
-        {/* Sold stamp */}
         {isSold && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12">
             <div className="border-2 border-white/60 text-white px-5 py-1.5 rounded font-hype text-base uppercase tracking-widest bg-black/40 backdrop-blur-sm">
@@ -246,7 +246,6 @@ function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: 
           </div>
         )}
 
-        {/* Bottom: name + stats */}
         <div className="absolute bottom-0 left-0 right-0">
           <div className="px-2.5 pb-1">
             <h3 className="font-hype text-[15px] uppercase leading-tight text-white truncate">{player.name}</h3>

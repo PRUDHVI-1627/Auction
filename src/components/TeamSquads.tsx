@@ -37,99 +37,144 @@ export default function TeamSquads({ user }: TeamSquadsProps) {
     </div>
   );
 
+  const totalSpent = teams.reduce((sum, t) => sum + (t.points_spent || 0), 0);
+
   return (
     <div className="min-h-screen bg-base text-ink font-sans pb-28">
-      {/* Header */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-accent/[0.03] pattern-diagonal pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
-        <div className="relative max-w-screen-2xl mx-auto px-5 sm:px-8 pt-8 pb-8">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-7 h-7 rounded-full border-2 border-accent flex items-center justify-center">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-accent)"><path d="M12 2L14.09 8.26L20.5 9.27L15.75 13.97L17.18 20.5L12 17.27L6.82 20.5L8.25 13.97L3.5 9.27L9.91 8.26L12 2Z" /></svg>
-            </div>
-            <span className="font-hype text-base uppercase tracking-wider text-ink-muted">VFL</span>
+      {/* === LEAGUE TABLE HEADER — gold accent, NOT blue like PlayerDirectory === */}
+      <div className="relative overflow-hidden bg-surface-2">
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 50%, var(--color-accent) 0%, transparent 50%), radial-gradient(circle at 80% 80%, var(--color-gold) 0%, transparent 50%)'
+        }} />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-accent via-gold to-accent" />
+
+        <div className="relative max-w-screen-2xl mx-auto px-5 sm:px-8 pt-10 pb-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center">
+                  <Trophy className="w-5 h-5 text-gold" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold">Franchise Rosters</span>
+              </div>
+              <h1 className="font-hype text-5xl sm:text-6xl md:text-7xl leading-[0.85] tracking-tight uppercase">
+                Team <span className="text-gold">Squads</span>
+              </h1>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="flex gap-6"
+            >
+              {[
+                { label: 'Franchises', value: teams.length },
+                { label: 'Signed', value: players.length },
+                { label: 'Total Spent', value: totalSpent, accent: true },
+              ].map(s => (
+                <div key={s.label} className="text-right">
+                  <span className="block text-[9px] font-bold uppercase tracking-widest text-ink-faint">{s.label}</span>
+                  <span className={cn("tnum text-2xl font-bold", s.accent ? "text-gold" : "text-ink")}>{s.value}</span>
+                </div>
+              ))}
+            </motion.div>
           </div>
-          <h1 className="font-hype text-5xl sm:text-6xl leading-[0.85] tracking-tight uppercase mb-2">
-            Team<br/><span className="text-accent">Squads</span>
-          </h1>
-          <p className="text-ink-muted text-sm">Every roster and budget breakdown.</p>
         </div>
       </div>
 
-      {/* Teams grid */}
-      <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 py-6">
+      {/* === TEAM CARDS === */}
+      <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 py-8">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {teams.map((team, idx) => {
             const teamPlayers = players.filter(p => p.sold_to_team_id === team.id);
             const budgetUsed = teamPlayers.reduce((sum, p) => sum + (p.sold_price || 0), 0);
             const budgetPct = team.total_budget > 0 ? Math.min(100, (budgetUsed / team.total_budget) * 100) : 0;
+            const remaining = team.total_budget - budgetUsed;
 
             return (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.04, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ delay: idx * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 key={team.id}
-                className="bg-surface rounded-lg border border-border overflow-hidden flex flex-col"
+                className="rounded-xl overflow-hidden border border-border bg-surface flex flex-col"
                 style={{ maxHeight: 560 }}
               >
-                {/* Team color accent bar */}
-                <div className="h-1" style={{ background: team.color || 'var(--color-accent)' }} />
-
-                <div className="p-5 border-b border-border flex-shrink-0">
-                  <div className="flex justify-between items-start">
+                {/* TALL team-color header */}
+                <div className="relative px-5 py-5" style={{ background: `linear-gradient(135deg, ${team.color || 'var(--color-accent)'}, ${team.color || 'var(--color-accent)'}88)` }}>
+                  <div className="absolute inset-0 pattern-diagonal opacity-20 pointer-events-none" />
+                  <div className="relative flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       {team.logo_url ? (
-                        <img src={team.logo_url} className="w-10 h-10 rounded-lg border border-border bg-surface-2 object-cover" />
+                        <img src={team.logo_url} className="w-12 h-12 rounded-xl border-2 border-white/20 bg-black/20 object-cover" />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-surface-2 border border-border flex items-center justify-center">
-                          <Trophy className="w-4 h-4 text-accent" />
+                        <div className="w-12 h-12 rounded-xl bg-black/20 border-2 border-white/20 flex items-center justify-center">
+                          <Trophy className="w-5 h-5 text-white/80" />
                         </div>
                       )}
                       <div>
-                        <h2 className="font-display text-lg font-bold text-ink">{team.name}</h2>
-                        <p className="text-[10px] text-ink-faint">{teamPlayers.length} players signed</p>
+                        <h2 className="font-hype text-2xl uppercase tracking-wide text-white drop-shadow-sm">{team.name}</h2>
+                        <p className="text-[10px] text-white/60 font-semibold">{teamPlayers.length} players signed</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[9px] text-ink-faint uppercase tracking-widest">Spent</span>
-                      <p className="tnum text-base font-bold text-ink">{budgetUsed}<span className="text-ink-faint font-normal">/{team.total_budget}</span></p>
+                      <span className="block tnum text-3xl font-bold text-white drop-shadow-sm">{remaining}</span>
+                      <span className="text-[9px] text-white/50 uppercase tracking-widest">VFL left</span>
                     </div>
                   </div>
 
-                  {/* Budget bar */}
-                  <div className="mt-3 h-1 bg-surface-2 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${budgetPct}%`, background: team.color || 'var(--color-accent)' }} />
+                  <div className="mt-4 h-2 bg-black/20 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${budgetPct}%` }}
+                      transition={{ delay: idx * 0.05 + 0.3, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                      className="h-full rounded-full bg-white/40"
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px] text-white/40 font-semibold">Spent {budgetUsed}</span>
+                    <span className="text-[9px] text-white/40 font-semibold">Budget {team.total_budget}</span>
                   </div>
                 </div>
 
-                <div className="p-5 overflow-y-auto flex-1">
-                  {teamPlayers.length > 0 ? teamPlayers.map((player) => (
-                    <div key={player.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-2 border border-border flex-shrink-0">
-                          <img src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt={player.name} />
-                        </div>
-                        <div>
-                          <span className="block text-sm font-medium text-ink">{player.name}</span>
-                          <span className="block text-[10px] text-ink-faint">{player.department || player.position} · {player.tier}</span>
-                        </div>
+                {/* Player list */}
+                <div className="p-4 overflow-y-auto flex-1">
+                  {teamPlayers.length > 0 ? (
+                    <div className="space-y-0">
+                      <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-border mb-1">
+                        <span className="col-span-1 text-[8px] uppercase tracking-widest text-ink-faint">#</span>
+                        <span className="col-span-7 text-[8px] uppercase tracking-widest text-ink-faint">Player</span>
+                        <span className="col-span-2 text-[8px] uppercase tracking-widest text-ink-faint text-center">Pos</span>
+                        <span className="col-span-2 text-[8px] uppercase tracking-widest text-ink-faint text-right">Price</span>
                       </div>
-                      <span className="tnum text-sm font-bold text-accent">{player.sold_price}</span>
+                      {teamPlayers.map((player, pIdx) => (
+                        <div key={player.id} className="grid grid-cols-12 gap-2 items-center px-2 py-2.5 border-b border-border/50 last:border-0 hover:bg-surface-2/50 transition-colors rounded">
+                          <span className="col-span-1 tnum text-[10px] text-ink-faint font-bold">{pIdx + 1}</span>
+                          <div className="col-span-7 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-2 border border-border flex-shrink-0">
+                              <img src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt={player.name} />
+                            </div>
+                            <div>
+                              <span className="block text-sm font-medium text-ink leading-tight">{player.name}</span>
+                              <span className="block text-[9px] text-ink-faint">{player.tier}</span>
+                            </div>
+                          </div>
+                          <span className="col-span-2 text-[10px] text-ink-muted font-semibold text-center uppercase">{(player.department || player.position || '—').slice(0, 3)}</span>
+                          <span className="col-span-2 tnum text-sm font-bold text-right" style={{ color: team.color || 'var(--color-accent)' }}>{player.sold_price}</span>
+                        </div>
+                      ))}
                     </div>
-                  )) : (
+                  ) : (
                     <div className="flex flex-col items-center justify-center py-14">
                       <Users className="w-7 h-7 text-ink-faint mb-3" />
                       <p className="text-xs text-ink-faint">No players signed yet</p>
                     </div>
                   )}
-                </div>
-
-                <div className="p-3.5 bg-surface-2 border-t border-border flex items-center gap-2 flex-shrink-0">
-                  <Wallet className="w-3.5 h-3.5 text-accent" />
-                  <span className="text-[10px] text-ink-muted font-medium">Remaining</span>
-                  <span className="tnum text-xs font-bold text-accent ml-auto">{team.total_budget - budgetUsed} VFL</span>
                 </div>
               </motion.div>
             );
