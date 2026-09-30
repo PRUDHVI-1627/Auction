@@ -1,10 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAuctionSessionRecord, supabaseAdmin } from '../../lib/supabaseAdmin.js';
+import { requireAdmin } from '../../lib/adminAuth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).end();
   }
+
+  const adminId = await requireAdmin(req, res);
+  if (!adminId) return;
 
   const requestedPlayerId = req.body?.playerId || null;
 
@@ -46,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { error: recycleErr } = await supabaseAdmin
           .from('players')
           .update({ status: 'UPCOMING', updated_at: new Date().toISOString() })
-          .eq('status', 'UNSOLD');
+          .eq('id', unsoldPlayers[0].id);
 
         if (recycleErr) {
           return res.status(500).json({ error: recycleErr.message });
@@ -61,6 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('players')
         .update({ status: 'UPCOMING' })
         .eq('id', session.current_player_id);
+
+      await supabaseAdmin
+        .from('bids')
+        .update({ is_undone: true })
+        .eq('player_id', session.current_player_id)
+        .eq('is_undone', false);
     }
 
     const { data: player, error: playerErr } = await supabaseAdmin

@@ -15,125 +15,172 @@ export default function TeamSquads({ user }: TeamSquadsProps) {
 
   useEffect(() => {
     fetchData();
-
-    // Live Sync for Roster Changes
     const channel = supabase
       .channel('roster-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchData())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   async function fetchData() {
-    const { data: teamData } = await supabase
-      .from('teams')
-      .select('*')
-      .order('name', { ascending: true });
-    
-    const { data: playerData } = await supabase
-      .from('players')
-      .select('*, teams(name)')
-      .eq('status', 'SOLD')
-      .order('sold_price', { ascending: false });
-
+    const { data: teamData } = await supabase.from('teams').select('*').order('name', { ascending: true });
+    const { data: playerData } = await supabase.from('players').select('*, teams(name)').eq('status', 'SOLD').order('sold_price', { ascending: false });
     setTeams(teamData || []);
     setPlayers(playerData || []);
     setLoading(false);
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4">
-      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-primary font-label uppercase text-[10px] tracking-widest font-black animate-pulse">Analyzing Squad Strength...</p>
+    <div className="min-h-screen bg-base flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
     </div>
   );
 
+  const totalSpent = teams.reduce((sum, t) => sum + (t.points_spent || 0), 0);
+
   return (
-    <div className="min-h-screen bg-surface text-white font-body selection:bg-primary selection:text-surface">
-      <header className="bg-black/80 backdrop-blur-xl sticky top-0 z-50 border-b border-white/5">
-        <div className="flex justify-between items-center w-full px-6 py-4 max-w-screen-2xl mx-auto">
-          <div className="text-2xl font-black italic tracking-tighter text-primary font-headline uppercase text-glow">
-            Roster Review
+    <div className="min-h-screen bg-base text-ink font-sans pb-28">
+      {/* === LEAGUE TABLE HEADER — gold accent, NOT blue like PlayerDirectory === */}
+      <div className="relative overflow-hidden bg-surface-2">
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'radial-gradient(circle at 20% 50%, var(--color-accent) 0%, transparent 50%), radial-gradient(circle at 80% 80%, var(--color-gold) 0%, transparent 50%)'
+        }} />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-accent via-gold to-accent" />
+
+        <div className="relative max-w-screen-2xl mx-auto px-5 sm:px-8 pt-10 pb-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center">
+                  <Trophy className="w-5 h-5 text-gold" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold">Franchise Rosters</span>
+              </div>
+              <h1 className="font-hype text-5xl sm:text-6xl md:text-7xl leading-[0.85] tracking-tight uppercase">
+                Team <span className="text-gold">Squads</span>
+              </h1>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="flex gap-6"
+            >
+              {[
+                { label: 'Franchises', value: teams.length },
+                { label: 'Signed', value: players.length },
+                { label: 'Total Spent', value: totalSpent, accent: true },
+              ].map(s => (
+                <div key={s.label} className="text-right">
+                  <span className="block text-[9px] font-bold uppercase tracking-widest text-ink-faint">{s.label}</span>
+                  <span className={cn("tnum text-2xl font-bold", s.accent ? "text-gold" : "text-ink")}>{s.value}</span>
+                </div>
+              ))}
+            </motion.div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-screen-2xl mx-auto px-6 py-12 pb-32">
-        <div className="flex flex-col gap-2 mb-12">
-           <h1 className="text-5xl font-headline font-black italic uppercase tracking-tighter text-white">Digital Colosseum Final Squads</h1>
-           <p className="text-white/40 font-label text-sm uppercase tracking-[0.2em]">Comprehensive Roster Analysis & Final Stats</p>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+      {/* === TEAM CARDS === */}
+      <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 py-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {teams.map((team, idx) => {
             const teamPlayers = players.filter(p => p.sold_to_team_id === team.id);
             const budgetUsed = teamPlayers.reduce((sum, p) => sum + (p.sold_price || 0), 0);
-            
+            const budgetPct = team.total_budget > 0 ? Math.min(100, (budgetUsed / team.total_budget) * 100) : 0;
+            const remaining = team.total_budget - budgetUsed;
+
             return (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
+                transition={{ delay: idx * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 key={team.id}
-                className="bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 overflow-hidden group hover:border-primary/30 transition-all flex flex-col h-[600px]"
+                className="rounded-xl overflow-hidden border border-border bg-surface flex flex-col"
+                style={{ maxHeight: 560 }}
               >
-                <div className="p-8 border-b border-white/5 bg-gradient-to-r from-primary/5 to-transparent flex-shrink-0">
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-primary" />
-                        <h2 className="text-3xl font-headline font-black italic uppercase tracking-tighter text-white group-hover:text-primary transition-colors">{team.name}</h2>
+                {/* TALL team-color header */}
+                <div className="relative px-5 py-5" style={{ background: `linear-gradient(135deg, ${team.color || 'var(--color-accent)'}, ${team.color || 'var(--color-accent)'}88)` }}>
+                  <div className="absolute inset-0 pattern-diagonal opacity-20 pointer-events-none" />
+                  <div className="relative flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      {team.logo_url ? (
+                        <img src={team.logo_url} className="w-12 h-12 rounded-xl border-2 border-white/20 bg-black/20 object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-black/20 border-2 border-white/20 flex items-center justify-center">
+                          <Trophy className="w-5 h-5 text-white/80" />
+                        </div>
+                      )}
+                      <div>
+                        <h2 className="font-hype text-2xl uppercase tracking-wide text-white drop-shadow-sm">{team.name}</h2>
+                        <p className="text-[10px] text-white/60 font-semibold">{teamPlayers.length} players signed</p>
                       </div>
-                      <p className="text-[10px] font-label font-bold text-white/20 uppercase tracking-[0.2em]">SQUAD SIZE: {teamPlayers.length} / 11</p>
                     </div>
                     <div className="text-right">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-primary font-label">Total Points Spent</span>
-                       <p className="text-2xl font-headline font-black italic text-white">{budgetUsed} / {team.total_budget} VFL</p>
+                      <span className="block tnum text-3xl font-bold text-white drop-shadow-sm">{remaining}</span>
+                      <span className="text-[9px] text-white/50 uppercase tracking-widest">VFL left</span>
                     </div>
+                  </div>
+
+                  <div className="mt-4 h-2 bg-black/20 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${budgetPct}%` }}
+                      transition={{ delay: idx * 0.05 + 0.3, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                      className="h-full rounded-full bg-white/40"
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px] text-white/40 font-semibold">Spent {budgetUsed}</span>
+                    <span className="text-[9px] text-white/40 font-semibold">Budget {team.total_budget}</span>
                   </div>
                 </div>
 
-                <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
-                  <div className="grid grid-cols-1 gap-4">
-                     {teamPlayers.length > 0 ? teamPlayers.map((player) => (
-                        <div key={player.id} className="flex justify-between items-center group/row hover:bg-white/5 p-3 rounded-xl transition-all border border-transparent hover:border-white/5">
-                           <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 bg-black/40">
-                                 <img src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt={player.name} />
-                              </div>
-                              <div className="flex flex-col">
-                                 <span className="text-sm font-bold text-white uppercase">{player.name}</span>
-                                 <span className="text-[9px] font-black uppercase text-white/40 tracking-widest leading-none mt-1">{player.department || player.position} • {player.tier}</span>
-                              </div>
-                           </div>
-                           <div className="text-right">
-                              <span className="text-lg font-headline font-black italic text-primary">{player.sold_price} VFL</span>
-                           </div>
+                {/* Player list */}
+                <div className="p-4 overflow-y-auto flex-1">
+                  {teamPlayers.length > 0 ? (
+                    <div className="space-y-0">
+                      <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-border mb-1">
+                        <span className="col-span-1 text-[8px] uppercase tracking-widest text-ink-faint">#</span>
+                        <span className="col-span-7 text-[8px] uppercase tracking-widest text-ink-faint">Player</span>
+                        <span className="col-span-2 text-[8px] uppercase tracking-widest text-ink-faint text-center">Pos</span>
+                        <span className="col-span-2 text-[8px] uppercase tracking-widest text-ink-faint text-right">Price</span>
+                      </div>
+                      {teamPlayers.map((player, pIdx) => (
+                        <div key={player.id} className="grid grid-cols-12 gap-2 items-center px-2 py-2.5 border-b border-border/50 last:border-0 hover:bg-surface-2/50 transition-colors rounded">
+                          <span className="col-span-1 tnum text-[10px] text-ink-faint font-bold">{pIdx + 1}</span>
+                          <div className="col-span-7 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-2 border border-border flex-shrink-0">
+                              <img src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt={player.name} />
+                            </div>
+                            <div>
+                              <span className="block text-sm font-medium text-ink leading-tight">{player.name}</span>
+                              <span className="block text-[9px] text-ink-faint">{player.tier}</span>
+                            </div>
+                          </div>
+                          <span className="col-span-2 text-[10px] text-ink-muted font-semibold text-center uppercase">{(player.department || player.position || '—').slice(0, 3)}</span>
+                          <span className="col-span-2 tnum text-sm font-bold text-right" style={{ color: team.color || 'var(--color-accent)' }}>{player.sold_price}</span>
                         </div>
-                     )) : (
-                        <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
-                           <Users className="w-12 h-12 text-white/10 mb-4" />
-                           <p className="text-[10px] font-label uppercase text-white/20 tracking-[0.3em] italic text-center px-10">No Legends Signed in this Pool yet</p>
-                        </div>
-                     )}
-                  </div>
-                </div>
-                
-                <div className="p-6 bg-black/20 border-t border-white/5 flex justify-between items-center flex-shrink-0">
-                   <div className="flex items-center gap-4 text-white/40 font-label text-[10px] font-bold uppercase tracking-widest">
-                      <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full"><Wallet className="w-3 h-3" /> REMAINING: {team.total_budget - budgetUsed} VFL</div>
-                   </div>
-                   <div className="text-[9px] font-black text-white/10 uppercase italic tracking-widest">Official VFL Roster</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-14">
+                      <Users className="w-7 h-7 text-ink-faint mb-3" />
+                      <p className="text-xs text-ink-faint">No players signed yet</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );
           })}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
