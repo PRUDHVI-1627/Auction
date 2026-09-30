@@ -16,7 +16,9 @@ export default function LandingScreen({ onLogin }: LandingScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  const [confirmSent, setConfirmSent] = useState(false);
   const [stats, setStats] = useState({ teams: 0, players: 0, pool: 0 });
+  const [recentSales, setRecentSales] = useState<any[]>([]);
 
   React.useEffect(() => {
     async function fetchStats() {
@@ -39,6 +41,20 @@ export default function LandingScreen({ onLogin }: LandingScreenProps) {
       }
     }
     fetchStats();
+    async function fetchRecentSales() {
+      try {
+        const { data } = await supabase
+          .from('players')
+          .select('name, sold_price, sold_to:teams(name)')
+          .eq('status', 'SOLD')
+          .order('updated_at', { ascending: false })
+          .limit(5);
+        if (data && data.length > 0) setRecentSales(data);
+      } catch (err) {
+        console.error('Failed to fetch recent sales', err);
+      }
+    }
+    fetchRecentSales();
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -58,19 +74,13 @@ export default function LandingScreen({ onLogin }: LandingScreenProps) {
 
     try {
       if (isSignUp) {
-        // Create the user
-        const { data, error } = await supabase.auth.signUp({ 
-          email, 
+        const { error } = await supabase.auth.signUp({
+          email,
           password,
           options: { data: { full_name: email.split('@')[0] } }
         });
         if (error) throw error;
-        
-        // Wait for session to be confirmed before navigating
-        if (data?.user) {
-          const { error: sessionErr } = await supabase.auth.getSession();
-          if (!sessionErr) onLogin();
-        }
+        setConfirmSent(true);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -102,33 +112,25 @@ export default function LandingScreen({ onLogin }: LandingScreenProps) {
       {/* Top Ticker Bar */}
       <div className="w-full bg-surface-container-lowest border-b border-outline-variant/20 py-2 overflow-hidden sticky top-0 z-[60]">
         <div className="ticker-scroll flex items-center gap-12">
-          {/* Ticker Items Repeated for continuous loop */}
-          <div className="flex items-center gap-2">
-            <span className="text-error font-label text-xs uppercase tracking-widest flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span> LIVE
-            </span>
-            <span className="font-label text-sm text-on-surface/80">TEAM TITANS BID <span className="text-primary">15 VFL</span> FOR <span className="font-bold">ARJUN V.</span></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-label text-sm text-on-surface/80 underline decoration-tertiary">SOLD:</span>
-            <span className="font-label text-sm text-on-surface/80">KAVYA R. TO TEAM PHOENIX AT <span className="text-tertiary">12 VFL</span></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-primary font-label text-xs uppercase tracking-widest">OUTBID</span>
-            <span className="font-label text-sm text-on-surface/80">TEAM WARRIORS RAISED TO <span className="text-primary">24 VFL</span> FOR <span className="font-bold">ROHAN S.</span></span>
-          </div>
-          {/* Repeat for Seamlessness */}
-          <div className="flex items-center gap-2">
-            <span className="text-error font-label text-xs uppercase tracking-widest flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span> LIVE
-            </span>
-            <span className="font-label text-sm text-on-surface/80 uppercase tracking-wider italic opacity-60">Signature Drafts:</span>
-            <span className="font-label text-sm text-on-surface/80 font-bold tracking-tight">TEAM TITANS BID <span className="text-primary">15 VFL</span> FOR <span className="font-bold">ARJUN V.</span></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-label text-sm text-on-surface/80 underline decoration-tertiary">SOLD:</span>
-            <span className="font-label text-sm text-on-surface/80">KAVYA R. TO TEAM PHOENIX AT <span className="text-tertiary">12 VFL</span></span>
-          </div>
+          {recentSales.length > 0 ? (
+            [...recentSales, ...recentSales].map((sale, i) => (
+              <div key={i} className="flex items-center gap-2 whitespace-nowrap">
+                <span className="font-label text-xs text-on-surface/40 uppercase tracking-widest underline decoration-tertiary">SOLD:</span>
+                <span className="font-label text-sm text-on-surface/80">
+                  <span className="font-bold">{sale.name}</span> TO <span className="font-bold">{(sale as any).sold_to?.name || 'FRANCHISE'}</span> AT <span className="text-primary">{sale.sold_price} VFL</span>
+                </span>
+              </div>
+            ))
+          ) : (
+            <>
+              {[1, 2].map(i => (
+                <div key={i} className="flex items-center gap-2 whitespace-nowrap">
+                  <span className="w-2 h-2 rounded-full bg-primary/20 animate-pulse"></span>
+                  <span className="font-label text-sm text-on-surface/30 uppercase tracking-widest italic">VFL DRAFT SEASON COMING SOON</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -178,8 +180,19 @@ export default function LandingScreen({ onLogin }: LandingScreenProps) {
               AUTHORIZATION REQUIRED • SECURE DRAFT ACCESS • PORTAL V2.0
             </p>
 
+            {confirmSent ? (
+              <div className="text-center py-8 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
+                  <Mail className="w-8 h-8 text-emerald-500" />
+                </div>
+                <h3 className="font-headline font-black italic uppercase text-2xl text-white">Check Your Email</h3>
+                <p className="text-white/40 font-label text-xs uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                  A confirmation link has been sent to <span className="text-primary">{email}</span>. Click it to activate your account.
+                </p>
+              </div>
+            ) : (
             <div className="flex flex-col items-center justify-center space-y-10">
-              <button 
+              <button
                 onClick={handleGoogleLogin}
                 disabled={loading}
                 className="w-full max-w-sm px-8 py-6 bg-gradient-to-br from-primary via-gold to-primary-container text-surface rounded-2xl transition-all shadow-[0_20px_40px_rgba(212,175,55,0.2)] hover:shadow-[0_30px_60px_rgba(212,175,55,0.4)] hover:-translate-y-1 active:scale-95 group flex items-center justify-center gap-6 disabled:opacity-50 border border-white/20"
@@ -198,6 +211,7 @@ export default function LandingScreen({ onLogin }: LandingScreenProps) {
                  Realtime Sync Active
               </div>
             </div>
+            )}
 
             <div className="mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between text-[10px] font-label text-on-surface/40 uppercase tracking-widest gap-4">
               <span>VFL 2026 SEASON • VEDAM FOOTBALL LEAGUE v1.5</span>

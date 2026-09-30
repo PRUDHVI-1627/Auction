@@ -142,6 +142,12 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
             <PlayerCard key={player.id} player={player} />
           ))}
         </section>
+        {filteredPlayers.length === 0 && !loading && (
+          <div className="text-center py-24 col-span-full">
+            <p className="font-headline font-black italic uppercase text-4xl text-white/10 tracking-tighter mb-2">No Players Found</p>
+            <p className="font-label text-xs text-white/20 uppercase tracking-widest">Try adjusting your filters or search term</p>
+          </div>
+        )}
       </main>
     </div>
   );

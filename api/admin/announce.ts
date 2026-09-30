@@ -1,8 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../lib/supabaseAdmin.js';
+import { requireAdmin } from '../../lib/adminAuth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
+    const verifiedAdminId = await requireAdmin(req, res);
+    if (!verifiedAdminId) return;
+
     const { message, adminId } = req.body;
 
     if (!message) {

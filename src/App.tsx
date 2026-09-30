@@ -36,6 +36,10 @@ export default function App() {
       .channel('announcements-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, (payload: any) => {
         setAnnouncement(payload.new);
+        const ttl = payload.new.expires_at
+          ? Math.max(0, new Date(payload.new.expires_at).getTime() - Date.now())
+          : 10_000;
+        setTimeout(() => setAnnouncement(null), ttl);
       })
       .subscribe();
 
@@ -85,7 +89,7 @@ export default function App() {
         email: user.email || '',
         name: user.user_metadata.full_name || user.email?.split('@')[0] || 'VFL Legend',
         avatar_url: user.user_metadata.avatar_url,
-      }, { onConflict: 'email' })
+      }, { onConflict: 'id' })
       .select('role')
       .single();
     
@@ -117,7 +121,13 @@ export default function App() {
       case 'team':
         return <TeamSquads user={user} />;
       case 'watchlist':
-        return <PlayerDirectory user={user} />;
+        return (
+          <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4 text-center px-6 pb-32">
+            <div className="text-6xl opacity-10">♥</div>
+            <h2 className="font-headline font-black italic uppercase text-3xl text-white/20 tracking-tighter">Watchlist</h2>
+            <p className="text-white/20 font-label text-xs uppercase tracking-widest">Coming soon — save players to follow them during the auction</p>
+          </div>
+        );
       default:
         return <PlayerDirectory user={user} />;
     }

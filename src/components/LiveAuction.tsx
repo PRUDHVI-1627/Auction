@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Bell, Wallet, PlusCircle, AlertTriangle, X, Loader2, Star, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -23,8 +23,11 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
   const [allTeams, setAllTeams] = useState<any[]>([]);
   const [sellAnimation, setSellAnimation] = useState<{player: any, type: 'SOLD' | 'UNSOLD'} | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const activePlayerRef = useRef<any>(null);
 
-    useEffect(() => {
+  useEffect(() => { activePlayerRef.current = activePlayer; }, [activePlayer]);
+
+  useEffect(() => {
     initAuction();
 
     const sessionSub = supabase
@@ -41,9 +44,16 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, async (payload: any) => {
         fetchBids(payload.new.player_id);
-        if (user) {
-          const { data: userData } = await supabase.from('users').select('team_id').eq('id', user.id).single();
-          if (userData?.team_id && payload.new.team_id !== userData.team_id) {
+        if (user && userTeamId && payload.new.team_id !== userTeamId) {
+          const { data: prevBid } = await supabase
+            .from('bids')
+            .select('team_id')
+            .eq('player_id', payload.new.player_id)
+            .eq('is_undone', false)
+            .order('created_at', { ascending: false })
+            .range(1, 1)
+            .maybeSingle();
+          if (prevBid?.team_id === userTeamId) {
             setOutbidToast(true);
             setTimeout(() => setOutbidToast(false), 5000);
           }
@@ -51,24 +61,20 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players' }, async (payload: any) => {
         if (payload.new.status === 'SOLD' || payload.new.status === 'UNSOLD') {
-           // Small delay to ensure DB secondary lookups are indexed
            setTimeout(async () => {
               fetchFinished();
               fetchUpcoming();
               fetchAllTeams();
               if (userTeamId) {
                  fetchTeamSquad(userTeamId);
-                 // Re-fetch the team profile to get updated points_spent
                  const { data: updatedTeam } = await supabase.from('teams').select('*').eq('id', userTeamId).maybeSingle();
                  setUserTeam(updatedTeam);
               }
            }, 500);
-           
-           // Trigger Sold/Unsold Animation
            setSellAnimation({ player: payload.new, type: payload.new.status });
            setTimeout(() => setSellAnimation(null), 5000);
         }
-        if (activePlayer && payload.new.id === activePlayer.id) {
+        if (activePlayerRef.current && payload.new.id === activePlayerRef.current.id) {
           setActivePlayer(payload.new);
         }
       })
@@ -84,7 +90,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
     return () => {
       supabase.removeChannel(sessionSub);
     };
-  }, [user, activePlayer?.id, userTeamId]);
+  }, [user, userTeamId]);
 
   // Timer Logic (P2 Fix)
   useEffect(() => {
@@ -133,32 +139,8 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
 
   async function initAuction() {
     const { data: { user } } = await supabase.auth.getUser();
-    
-    // Fetch profile with ultra-resilient lookup
-    let userDataProfile = null;
-    if (user) {
-      // 1. Precise ID lookup
-      const { data } = await supabase
-        .from('users')
-        .select('*, teams(*)')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      if (!data) {
-        // 2. Case-insensitive email fallback
-        const { data: emailMatch } = await supabase
-          .from('users')
-          .select('*, teams(*)')
-          .ilike('email', user.email)
-          .maybeSingle();
-        userDataProfile = emailMatch;
-      } else {
-        userDataProfile = data;
-      }
-    }
-
     const { data: sess } = await supabase.from('auction_session').select('*').single();
-    
+
     let teamId = null;
     let team = null;
 
@@ -394,7 +376,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                                        <div className="w-1.5 h-1.5 rounded-full bg-white/10"></div>
                                        <span className="text-[9px] font-black uppercase tracking-widest text-white/60 truncate max-w-[100px]">{t.name}</span>
                                      </div>
-                                     <span className="text-xs font-headline font-black italic text-primary leading-none">{100 - (t.points_spent || 0)} <span className="text-[7px] font-label not-italic opacity-40">VFL</span></span>
+                                     <span className="text-xs font-headline font-black italic text-primary leading-none">{(t.total_budget || 100) - (t.points_spent || 0)} <span className="text-[7px] font-label not-italic opacity-40">VFL</span></span>
                                   </div>
                                ))}
                             </div>
@@ -717,7 +699,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                            return (
                            <button
                              key={increment}
-                             disabled={isBidding || session?.status !== 'LIVE'}
+                             disabled={isBidding || session?.status !== 'LIVE' || isLeading}
                              onClick={() => handleBid(increment)}
                              className={cn(
                                "group relative flex items-center justify-between p-3 rounded-xl border transition-all active:scale-[0.98] disabled:opacity-50",
@@ -765,7 +747,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                             <div className="flex items-center gap-2 mb-1 truncate">
                                <span className={cn("text-[7px] font-black uppercase tracking-widest truncate", userTeamId === t.id ? "text-primary" : "text-white/40")}>{t.name}</span>
                             </div>
-                            <p className="text-xs font-headline font-black italic tracking-tight">{100 - (t.points_spent || 0)} <span className="text-[7px] opacity-40">VFL</span></p>
+                            <p className="text-xs font-headline font-black italic tracking-tight">{(t.total_budget || 100) - (t.points_spent || 0)} <span className="text-[7px] opacity-40">VFL</span></p>
                          </div>
                       ))}
                    </div>

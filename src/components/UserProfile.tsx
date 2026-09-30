@@ -50,8 +50,8 @@ export default function UserProfile({ user, onLogout }: UserProfileProps) {
         .from('teams')
         .select('id, points_spent')
         .order('points_spent', { ascending: false });
-      const rank = allTeams?.findIndex(t => t.id === profile.teams.id) ?? null;
-      setTeamRank(rank !== null ? rank + 1 : null);
+      const rank = allTeams?.findIndex(t => t.id === profile.teams.id) ?? -1;
+      setTeamRank(rank !== -1 ? rank + 1 : null);
     }
     setLoading(false);
   }
@@ -167,7 +167,7 @@ export default function UserProfile({ user, onLogout }: UserProfileProps) {
               </div>
             </div>
             
-            <button className="w-full py-4 bg-white/5 hover:bg-white/10 text-[10px] font-label font-black uppercase tracking-[0.2em] text-primary transition-all flex items-center justify-center gap-2 border-t border-white/5">
+            <button disabled title="Coming soon" className="w-full py-4 bg-white/5 text-[10px] font-label font-black uppercase tracking-[0.2em] text-primary/40 flex items-center justify-center gap-2 border-t border-white/5 cursor-not-allowed">
               VIEW FULL ROSTER <ChevronRight className="w-4 h-4" />
             </button>
           </motion.div>
@@ -188,9 +188,11 @@ export default function UserProfile({ user, onLogout }: UserProfileProps) {
             { id: 'history', label: 'Bid History', sub: 'Your past activity', icon: History, color: 'text-primary' },
             { id: 'support', label: 'Support & Help', sub: 'FAQ and troubleshooting', icon: HelpCircle, color: 'text-white/40' },
           ].map((item) => (
-            <button 
+            <button
               key={item.id}
-              className="w-full flex items-center justify-between p-4 bg-surface-container/60 hover:bg-surface-container-high border border-white/5 rounded-xl transition-all group active:scale-[0.98]"
+              disabled
+              title="Coming soon"
+              className="w-full flex items-center justify-between p-4 bg-surface-container/60 border border-white/5 rounded-xl opacity-40 cursor-not-allowed group"
             >
               <div className="flex items-center gap-4">
                 <div className={cn("p-2 rounded-lg bg-surface-container-highest group-hover:scale-110 transition-transform", item.color)}>

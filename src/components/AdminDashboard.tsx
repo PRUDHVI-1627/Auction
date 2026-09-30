@@ -43,13 +43,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, (payload: any) => {
-        // Only add if the bid belongs to our active player
         if (activePlayer && payload.new.player_id === activePlayer.id) {
-          setBids(prev => {
-            // Avoid duplicate bids if already fetched
-            if (prev.some(b => b.id === payload.new.id)) return prev;
-            return [payload.new, ...prev];
-          });
+          fetchBids(payload.new.player_id);
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players' }, (payload: any) => {
@@ -66,6 +61,14 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     return () => { supabase.removeChannel(sub); };
   }, [activePlayer?.id]);
 
+
+  async function getAuthHeaders(): Promise<HeadersInit> {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+    };
+  }
 
   async function initAdmin() {
     const { data: sess } = await supabase.from('auction_session').select('*').single();
@@ -111,6 +114,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       .from('bids')
       .select('*, teams(name)')
       .eq('player_id', playerId)
+      .eq('is_undone', false)
       .order('created_at', { ascending: false });
     setBids(data || []);
   }
@@ -206,10 +210,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   async function togglePause() {
     if (!session) return;
     try {
-      // 4. API call for pause/resume
       await fetch('/api/admin/pause', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: await getAuthHeaders(),
       });
     } catch (err) {
       console.error('Error toggling pause:', err);
@@ -219,10 +222,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   async function undoLastBid() {
     if (!activePlayer || bids.length === 0) return;
     try {
-      // 5. API call for undo last bid
       const response = await fetch('/api/admin/undo-bid', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ playerId: activePlayer.id })
       });
 
@@ -232,6 +234,26 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       }
     } catch (err) {
       console.error('Error undoing bid:', err);
+    }
+  }
+
+  async function handleStartTimer(durationSeconds = 30) {
+    if (!activePlayer) return;
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/auction/start-timer', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ durationSeconds }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server returned ${response.status}`);
+      }
+    } catch (err: any) {
+      alert('Failed to start timer: ' + err.message);
+    } finally {
+      setIsProcessing(false);
     }
   }
 
@@ -280,10 +302,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     if (!announcement) return;
     setIsProcessing(true);
     try {
-      // 7. API call for broadcasting
       const response = await fetch('/api/admin/announce', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           message: announcement,
           adminId: user?.id
@@ -329,7 +350,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
     try {
       const response = await fetch('/api/admin/reset', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: await getAuthHeaders(),
       });
 
       if (!response.ok) throw new Error(`Reset failed with ${response.status}`);
@@ -445,29 +466,40 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </div>
                 </div>
 
-                <div className="p-4 grid grid-cols-2 gap-4 bg-white/5 backdrop-blur-3xl">
-                   <button 
-                    onClick={handleSold} 
-                    disabled={bids.length === 0 || isProcessing} 
-                    className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border border-emerald-500/20 p-5 rounded-2xl transition-all flex flex-col items-center gap-2 group disabled:opacity-20 disabled:cursor-not-allowed"
+                <div className="p-4 space-y-3 bg-white/5 backdrop-blur-3xl">
+                   <div className="grid grid-cols-2 gap-3">
+                     <button
+                      onClick={handleSold}
+                      disabled={bids.length === 0 || isProcessing}
+                      className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border border-emerald-500/20 p-5 rounded-2xl transition-all flex flex-col items-center gap-2 group disabled:opacity-20 disabled:cursor-not-allowed"
+                     >
+                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin text-emerald-500" /> : <Gavel className="w-6 h-6 group-hover:scale-110 transition-transform" />}
+                        <span className="font-black uppercase text-[10px] tracking-widest">Confirm Sale</span>
+                     </button>
+                     <button
+                      onClick={handleUnsold}
+                      disabled={isProcessing}
+                      className="bg-error/10 hover:bg-error text-error hover:text-white border border-error/20 p-5 rounded-2xl transition-all flex flex-col items-center gap-2 group disabled:opacity-20"
+                     >
+                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin text-error" /> : <Ban className="w-6 h-6 group-hover:scale-110 transition-transform" />}
+                        <span className="font-black uppercase text-[10px] tracking-widest">Mark Unsold</span>
+                     </button>
+                   </div>
+                   <button
+                     onClick={handleStartTimer}
+                     disabled={isProcessing}
+                     className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 py-3 rounded-2xl transition-all flex items-center justify-center gap-2 group disabled:opacity-20"
                    >
-                      {isProcessing ? <Loader2 className="w-6 h-6 animate-spin text-emerald-500" /> : <Gavel className="w-6 h-6 group-hover:scale-110 transition-transform" />}
-                      <span className="font-black uppercase text-[10px] tracking-widest">Confirm Sale</span>
-                   </button>
-                   <button 
-                    onClick={handleUnsold} 
-                    disabled={isProcessing}
-                    className="bg-error/10 hover:bg-error text-error hover:text-white border border-error/20 p-5 rounded-2xl transition-all flex flex-col items-center gap-2 group disabled:opacity-20"
-                   >
-                      {isProcessing ? <Loader2 className="w-6 h-6 animate-spin text-error" /> : <Ban className="w-6 h-6 group-hover:scale-110 transition-transform" />}
-                      <span className="font-black uppercase text-[10px] tracking-widest">Mark Unsold</span>
+                     <Play className="w-4 h-4 fill-primary group-hover:scale-110 transition-transform" />
+                     <span className="font-black uppercase text-[10px] tracking-widest">Start Timer (30s)</span>
                    </button>
                  </div>
               </motion.div>
             ) : (
               <div className="aspect-[3/4] border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center text-center p-10 bg-white/[0.02]">
-                  <Loader2 className="w-10 h-10 text-white/10 mb-4 animate-spin" />
-                  <p className="font-label text-xs uppercase tracking-widest text-white/20">Awaiting next entry...</p>
+                  <Gavel className="w-10 h-10 text-white/10 mb-4" />
+                  <p className="font-label text-xs uppercase tracking-widest text-white/20">No player in spotlight</p>
+                  <p className="font-label text-[9px] uppercase tracking-widest text-white/10 mt-2">Use "Call Player" above to start</p>
               </div>
             )}
           </div>
@@ -511,7 +543,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                    {bids.length === 0 && <div className="text-center py-20 text-white/10 font-black uppercase tracking-[0.5em] text-xs">Waiting for opening bid</div>}
                 </div>
                 <div className="p-6 bg-black/40 border-t border-white/5 space-y-4">
-                   <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
+                   {activePlayer && <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
                       <p className="text-[10px] font-black uppercase text-primary tracking-widest">Marshall Override</p>
                       <div className="flex gap-2">
                          <select 
@@ -529,7 +561,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                            onChange={(e) => setManualAmount(e.target.value)}
                            className="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] font-black placeholder:text-white/20 outline-none focus:border-primary transition-all text-center"
                          />
-                         <button 
+                         <button
                            onClick={handleManualOverrideBid}
                            disabled={isProcessing || !selectedTeamId || !manualAmount}
                            className="bg-primary text-surface font-black px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest hover:brightness-110 disabled:opacity-20 transition-all"
@@ -537,7 +569,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                            Bid
                          </button>
                       </div>
-                   </div>
+                   </div>}
 
                    <button 
                     onClick={undoLastBid}
@@ -597,7 +629,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 <h4 className="font-black uppercase text-[9px] tracking-widest text-white/20 mb-4">Upcoming Bench</h4>
                 <div className="space-y-3">
                    {upcomingPlayers.slice(0, 5).map(p => (
-                      <div key={p.id} className="flex justify-between items-center group cursor-help">
+                      <div key={p.id} className="flex justify-between items-center group" title={p.position}>
                          <span className="text-xs font-bold text-white/60 group-hover:text-white transition-colors uppercase">{p.name}</span>
                          <span className="text-[9px] font-black uppercase text-white/20">{p.tier}</span>
                       </div>

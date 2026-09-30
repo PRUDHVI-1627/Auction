@@ -69,6 +69,15 @@ export async function placeBid({ playerId, teamId, amount, increment_used, userI
 }
 
 export async function finalizeSale(playerId: string, teamId: string, price: number) {
+  const { data: existingPlayer, error: existingErr } = await supabaseAdmin
+    .from('players')
+    .select('status')
+    .eq('id', playerId)
+    .single();
+
+  if (existingErr) throw new Error(existingErr.message);
+  if (existingPlayer?.status === 'SOLD') throw new Error('Player has already been sold');
+
   const { data: team, error: teamErr } = await supabaseAdmin
     .from('teams')
     .select('points_spent')
