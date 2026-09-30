@@ -7,36 +7,30 @@
   --font-mono: "JetBrains Mono", monospace;
   --font-hype: "Anton", sans-serif;
 
-  /* Base surfaces: deep night-match navy, not neutral black */
-  --color-base: #05070f;
-  --color-surface: #0c1122;
-  --color-surface-2: #131a30;
-  --color-surface-3: #1b2440;
+  --color-base: #060a13;
+  --color-surface: #0c1220;
+  --color-surface-2: #121a2e;
+  --color-surface-3: #1a2540;
 
-  /* Borders */
-  --color-border: #212a4a;
-  --color-border-strong: #313f6e;
+  --color-border: #172040;
+  --color-border-strong: #243560;
 
-  /* Text */
-  --color-ink: #f4f6fc;
-  --color-ink-muted: #8891b5;
-  --color-ink-faint: #4c5478;
+  --color-ink: #eef1fa;
+  --color-ink-muted: #7a85aa;
+  --color-ink-faint: #3b4568;
 
-  /* Brand accent: European-night electric blue */
-  --color-accent: #2f5fff;
-  --color-accent-hover: #4d76ff;
+  --color-accent: #2979ff;
+  --color-accent-hover: #448aff;
   --color-accent-ink: #ffffff;
 
-  /* Semantic (status only, not decorative) */
-  --color-success: #17a862;
-  --color-success-ink: #ffffff;
-  --color-danger: #e5383b;
+  --color-success: #00e676;
+  --color-success-ink: #000000;
+  --color-danger: #ff1744;
   --color-danger-ink: #ffffff;
 
-  /* Tier marks (flat, no glow) */
-  --color-gold: #d4af6a;
-  --color-silver: #a9b3cf;
-  --color-bronze: #b3713f;
+  --color-gold: #ffd600;
+  --color-silver: #90a4ae;
+  --color-bronze: #bf6b2a;
 }
 
 @layer base {
@@ -51,7 +45,6 @@
   }
 }
 
-/* Ticker marquee (landing page sold-players strip) */
 .ticker-scroll {
   display: flex;
   white-space: nowrap;
@@ -63,13 +56,11 @@
   100% { transform: translateX(-50%); }
 }
 
-/* Tabular numerals for bid amounts / stats */
 .tnum {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Flat tier stripe (replaces glow/box-shadow tier treatment) */
 .tier-stripe {
   position: relative;
 }
@@ -84,32 +75,35 @@
 .tier-stripe--silver::before { background: var(--color-silver); }
 .tier-stripe--bronze::before { background: var(--color-bronze); }
 
-/* Floodlight + starfield texture: applied once, fixed, pointer-events-none */
-.stadium-texture {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    radial-gradient(circle at 15% 20%, rgba(47, 95, 255, 0.16) 0%, transparent 40%),
-    radial-gradient(circle at 85% 0%, rgba(47, 95, 255, 0.12) 0%, transparent 38%),
-    radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.5) 50%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 75% 15%, rgba(255,255,255,0.4) 50%, transparent 100%),
-    radial-gradient(1px 1px at 50% 60%, rgba(255,255,255,0.35) 50%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 90% 70%, rgba(255,255,255,0.3) 50%, transparent 100%),
-    radial-gradient(1px 1px at 35% 80%, rgba(255,255,255,0.3) 50%, transparent 100%),
-    radial-gradient(1.5px 1.5px at 10% 65%, rgba(255,255,255,0.25) 50%, transparent 100%);
+.pattern-diagonal {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 40px,
+    rgba(255, 255, 255, 0.015) 40px,
+    rgba(255, 255, 255, 0.015) 41px
+  );
 }
 
-/* Pitch line arc: subtle center-circle motif for hero sections */
-.pitch-arc {
-  position: absolute;
-  border: 1px solid rgba(136, 145, 181, 0.14);
-  border-radius: 9999px;
-  pointer-events: none;
+.accent-glow {
+  box-shadow: 0 0 60px rgba(41, 121, 255, 0.12), 0 0 120px rgba(41, 121, 255, 0.06);
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes live-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.7; }
+}
+
+.live-dot {
+  animation: live-dot 1.5s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticker-scroll {
-    animation: none;
-  }
+  .ticker-scroll { animation: none; }
+  .live-dot { animation: none; }
 }
