@@ -47,8 +47,34 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-base flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
+      <div className="min-h-screen bg-base pb-28">
+        {/* Skeleton hero */}
+        <div className="bg-accent/20 clip-slant-br">
+          <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 pt-10 pb-16">
+            <div className="skeleton w-32 h-3 mb-4" />
+            <div className="skeleton w-64 h-12 mb-2" />
+            <div className="skeleton w-48 h-12" />
+          </div>
+        </div>
+        <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 -mt-8 relative z-10">
+          <div className="bezel">
+            <div className="bezel-inner grid grid-cols-4 divide-x divide-border">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="px-4 py-5 flex flex-col items-center gap-2">
+                  <div className="skeleton w-12 h-3" />
+                  <div className="skeleton w-8 h-8" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 pt-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="aspect-[3/4] rounded-lg skeleton" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -59,53 +85,55 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
 
   return (
     <div className="min-h-screen bg-base text-ink font-sans pb-28">
-      {/* === BOLD ACCENT HERO === */}
-      <div className="relative bg-accent clip-slant-br">
+      {/* === BOLD ACCENT HERO with grain overlay === */}
+      <div className="relative bg-accent clip-slant-br grain">
         <div className="absolute inset-0 pattern-diagonal opacity-30 pointer-events-none" />
-        <div className="relative max-w-screen-2xl mx-auto px-5 sm:px-8 pt-10 pb-16">
+        <div className="relative z-[2] max-w-screen-2xl mx-auto px-5 sm:px-8 pt-10 pb-16">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ type: 'spring', stiffness: 200, damping: 24 }}
           >
             <span className="inline-block text-[10px] font-bold uppercase tracking-[0.25em] text-white/60 mb-3">VFL Draft Pool</span>
-            <h1 className="font-hype text-6xl sm:text-7xl md:text-8xl leading-[0.85] tracking-tight uppercase text-white">
+            <h1 className="font-hype text-6xl sm:text-7xl md:text-8xl leading-[0.85] tracking-tighter uppercase text-white" style={{ textWrap: 'balance' }}>
               Player<br />Directory
             </h1>
           </motion.div>
         </div>
       </div>
 
-      {/* === SCOREBOARD STATS BAR === */}
+      {/* === SCOREBOARD STATS — double-bezel card === */}
       <div className="relative -mt-8 z-10 max-w-screen-2xl mx-auto px-5 sm:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-surface-2 border border-border rounded-xl overflow-hidden scoreboard-shimmer"
+          transition={{ type: 'spring', stiffness: 200, damping: 26, delay: 0.1 }}
+          className="bezel scoreboard-shimmer"
         >
-          <div className="grid grid-cols-4 divide-x divide-border">
-            {[
-              { label: 'Total Pool', value: players.length, color: 'text-ink' },
-              { label: 'Sold', value: soldCount, color: 'text-success' },
-              { label: 'Live Now', value: liveCount, color: 'text-danger' },
-              { label: 'Upcoming', value: upcomingCount, color: 'text-ink-muted' },
-            ].map((stat) => (
-              <div key={stat.label} className="px-4 py-4 sm:px-6 sm:py-5 text-center">
-                <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-1">{stat.label}</span>
-                <span className={cn("tnum text-2xl sm:text-4xl font-bold leading-none", stat.color)}>
-                  {stat.value}
-                </span>
-                {stat.label === 'Live Now' && liveCount > 0 && (
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger live-dot ml-1.5 -translate-y-3" />
-                )}
-              </div>
-            ))}
+          <div className="bezel-inner">
+            <div className="grid grid-cols-4 divide-x divide-border">
+              {[
+                { label: 'Total Pool', value: players.length, color: 'text-ink' },
+                { label: 'Sold', value: soldCount, color: 'text-success' },
+                { label: 'Live Now', value: liveCount, color: 'text-danger' },
+                { label: 'Upcoming', value: upcomingCount, color: 'text-ink-muted' },
+              ].map((stat) => (
+                <div key={stat.label} className="px-4 py-4 sm:px-6 sm:py-5 text-center">
+                  <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-1">{stat.label}</span>
+                  <span className={cn("tnum text-2xl sm:text-4xl font-bold leading-none", stat.color)}>
+                    {stat.value}
+                  </span>
+                  {stat.label === 'Live Now' && liveCount > 0 && (
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger live-dot ml-1.5 -translate-y-3" />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>
 
-      {/* === SEARCH + FILTERS === */}
+      {/* === SEARCH + FILTERS — tactile controls === */}
       <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 pt-8 pb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-0 bg-surface-2 rounded-lg p-1 border border-border">
@@ -114,10 +142,10 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
                 key={pos}
                 onClick={() => setActivePosition(pos)}
                 className={cn(
-                  "px-4 py-2 text-xs font-bold rounded-md transition-all uppercase tracking-wider",
+                  "px-4 py-2 text-xs font-bold rounded-md transition-colors uppercase tracking-wider focus-ring press",
                   activePosition === pos
                     ? "bg-accent text-white shadow-sm"
-                    : "text-ink-faint hover:text-ink"
+                    : "text-ink-faint hover:text-ink hover:bg-surface-3"
                 )}
               >
                 {pos}
@@ -138,7 +166,7 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
                   key={s.id}
                   onClick={() => setActiveStatus(s.id)}
                   className={cn(
-                    "px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all",
+                    "px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors focus-ring press",
                     activeStatus === s.id
                       ? s.color === 'danger' ? "bg-danger text-white"
                         : s.color === 'success' ? "bg-success text-black"
@@ -154,7 +182,7 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
             <div className="relative flex-1 sm:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
               <input
-                className="w-full h-9 bg-surface border border-border focus:border-accent rounded-lg pl-9 pr-4 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors"
+                className="w-full h-9 bg-surface/80 backdrop-blur-sm border border-border focus:border-accent rounded-lg pl-9 pr-4 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors focus-ring"
                 placeholder="Search..."
                 type="text"
                 value={searchTerm}
@@ -165,7 +193,7 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
         </div>
       </div>
 
-      {/* === CARD GRID === */}
+      {/* === CARD GRID — spring stagger === */}
       <div className="max-w-screen-2xl mx-auto px-5 sm:px-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredPlayers.map((player, index) => (
@@ -174,9 +202,14 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
         </div>
 
         {filteredPlayers.length === 0 && !loading && (
-          <div className="text-center py-24">
-            <p className="font-hype text-3xl text-ink-muted uppercase mb-2">No players found</p>
-            <p className="text-ink-faint text-sm">Adjust your filters or search term.</p>
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-surface-2 border border-border flex items-center justify-center">
+              <Search className="w-7 h-7 text-ink-faint" />
+            </div>
+            <div className="text-center">
+              <p className="font-hype text-3xl text-ink-muted uppercase mb-2">No players found</p>
+              <p className="text-ink-faint text-sm max-w-xs" style={{ textWrap: 'balance' }}>Try adjusting your filters or search term to see more results.</p>
+            </div>
           </div>
         )}
       </div>
@@ -200,10 +233,10 @@ function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: 
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: Math.min(index, 20) * 0.025, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={!isSold ? { y: -3, transition: { type: 'spring', stiffness: 400, damping: 26 } } : {}}
+      transition={{ type: 'spring', stiffness: 260, damping: 24, delay: Math.min(index, 20) * 0.03 }}
+      whileHover={!isSold ? { y: -4, transition: { type: 'spring', stiffness: 400, damping: 26 } } : {}}
       className={cn(
-        "group relative overflow-hidden rounded-lg",
+        "group relative overflow-hidden rounded-lg cursor-pointer",
         isSold && 'opacity-65'
       )}
       style={{ backgroundColor: teamColor }}
@@ -211,7 +244,7 @@ function PlayerCard({ player, index = 0 }: { player: any; index?: number; key?: 
       <div className="aspect-[3/4] relative overflow-hidden">
         <img
           alt={player.name}
-          className="absolute inset-y-0 left-[14%] w-[72%] h-full object-cover object-top grayscale-[0.1] group-hover:grayscale-0 transition-all duration-500 drop-shadow-[0_6px_16px_rgba(0,0,0,0.5)]"
+          className="absolute inset-y-0 left-[14%] w-[72%] h-full object-cover object-top grayscale-[0.1] group-hover:grayscale-0 transition-[filter] duration-500 drop-shadow-[0_6px_16px_rgba(0,0,0,0.5)]"
           src={player.photo_url || 'https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?q=80&w=1470&auto=format&fit=crop'}
           referrerPolicy="no-referrer"
         />
