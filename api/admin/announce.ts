@@ -7,9 +7,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const verifiedAdminId = await requireAdmin(req, res);
     if (!verifiedAdminId) return;
 
-    const { message, adminId } = req.body;
+    const { message } = req.body ?? {};
 
-    if (!message) {
+    if (typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
@@ -18,8 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { error: insertErr } = await supabaseAdmin
       .from('announcements')
       .insert([{
-        message,
-        created_by_admin_id: adminId || null,
+        message: message.trim().slice(0, 500),
+        created_by_admin_id: verifiedAdminId,
         expires_at: expiresAt,
       }]);
 

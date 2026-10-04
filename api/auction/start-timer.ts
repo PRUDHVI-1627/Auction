@@ -8,7 +8,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const adminId = await requireAdmin(req, res);
   if (!adminId) return;
 
-  const durationSeconds = Number(req.body?.durationSeconds) || 30;
+  const durationSeconds = Math.min(Math.max(Number(req.body?.durationSeconds) || 30, 5), 600);
 
   try {
     const session = await getAuctionSessionRecord();

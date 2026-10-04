@@ -82,17 +82,14 @@ export default function App() {
   }, []);
 
   async function syncUserProfile(user: User) {
+    // The row is created by the sign-up trigger (and the browser has no write access to
+    // users under RLS), so only read the role here.
     const { data, error } = await supabase
       .from('users')
-      .upsert({
-        id: user.id,
-        email: user.email || '',
-        name: user.user_metadata.full_name || user.email?.split('@')[0] || 'VFL Legend',
-        avatar_url: user.user_metadata.avatar_url,
-      }, { onConflict: 'id' })
       .select('role')
-      .single();
-    
+      .eq('id', user.id)
+      .maybeSingle();
+
     if (error) console.error('Error syncing profile:', error.message);
     
     if (data?.role === 'ADMIN') {
