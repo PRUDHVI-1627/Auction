@@ -155,8 +155,13 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
     try {
       const currentHighest = bids.length > 0 ? bids[0].amount : (activePlayer.base_price - 1);
       const bidAmount = currentHighest + increment;
+      const { data: { session: authSession } } = await supabase.auth.getSession();
       const response = await fetch('/api/bids', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authSession?.access_token ? { 'Authorization': `Bearer ${authSession.access_token}` } : {}),
+        },
         body: JSON.stringify({ playerId: activePlayer.id, teamId: effectiveTeamId, amount: bidAmount, increment_used: increment, userId: user.id })
       });
       if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `Server returned ${response.status}`); }

@@ -1,7 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './supabaseAdmin.js';
 
-export async function requireAdmin(req: VercelRequest, res: VercelResponse): Promise<string | null> {
+export interface AuthedUser {
+  id: string;
+  role: string | null;
+  teamId: string | null;
+}
+
+export async function requireUser(req: VercelRequest, res: VercelResponse): Promise<AuthedUser | null> {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -18,11 +24,18 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
 
   const { data: profile } = await supabaseAdmin
     .from('users')
-    .select('role')
+    .select('role, team_id')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  if (profile?.role !== 'ADMIN') {
+  return { id: user.id, role: profile?.role ?? null, teamId: profile?.team_id ?? null };
+}
+
+export async function requireAdmin(req: VercelRequest, res: VercelResponse): Promise<string | null> {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+
+  if (user.role !== 'ADMIN') {
     res.status(403).json({ error: 'Admin access required' });
     return null;
   }

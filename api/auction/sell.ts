@@ -8,9 +8,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const adminId = await requireAdmin(req, res);
   if (!adminId) return;
 
-  const { playerId, teamId, price } = req.body;
+  const { playerId, teamId, price } = req.body ?? {};
   try {
-    await finalizeSale(playerId, teamId, price);
+    await finalizeSale(playerId, teamId, Number(price));
     return res.status(200).json({ success: true });
   } catch (err: any) {
     return res.status(400).json({ error: err.message });

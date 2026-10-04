@@ -17,6 +17,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const { data: target, error: targetErr } = await supabaseAdmin
+      .from('players').select('status').eq('id', playerId).maybeSingle();
+    if (targetErr) return res.status(500).json({ error: targetErr.message });
+    if (!target) return res.status(404).json({ error: 'Player not found' });
+    if (target.status === 'SOLD') return res.status(400).json({ error: 'Sold players cannot be marked unsold' });
+
     await updateAuctionSessionRecord({ current_player_id: null, timer_expires_at: null });
 
     const { error: playErr } = await supabaseAdmin
