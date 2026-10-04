@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Search } from 'lucide-react';
 import type { Player } from '../types';
@@ -16,14 +16,28 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     fetchPlayers();
+    // A sale updates a player row and a team row, and the admin's queue edits
+    // arrive in bursts. Without coalescing, each one re-read the whole roster.
+    const scheduleFetch = () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        fetchPlayers();
+      }, 400);
+    };
     const channel = supabase
       .channel('players-all')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchPlayers())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchPlayers())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, scheduleFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, scheduleFetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function fetchPlayers() {
@@ -35,15 +49,18 @@ export default function PlayerDirectory({ user }: PlayerDirectoryProps) {
     setLoading(false);
   }
 
-  const filteredPlayers = players.filter(p => {
-    const matchesPos = activePosition === 'All' ||
-      p.position === activePosition ||
-      (p.position && p.position.includes(activePosition)) ||
-      (p.department && p.department.includes(activePosition));
-    const matchesStatus = activeStatus === 'ALL' || p.status === activeStatus;
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesPos && matchesStatus && matchesSearch;
-  });
+  const filteredPlayers = useMemo(() => {
+    const needle = searchTerm.toLowerCase();
+    return players.filter(p => {
+      const matchesPos = activePosition === 'All' ||
+        p.position === activePosition ||
+        (p.position && p.position.includes(activePosition)) ||
+        (p.department && p.department.includes(activePosition));
+      const matchesStatus = activeStatus === 'ALL' || p.status === activeStatus;
+      const matchesSearch = p.name.toLowerCase().includes(needle);
+      return matchesPos && matchesStatus && matchesSearch;
+    });
+  }, [players, activePosition, activeStatus, searchTerm]);
 
   if (loading) {
     return (

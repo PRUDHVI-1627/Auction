@@ -1,17 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import LandingScreen from './components/LandingScreen';
-import AdminDashboard from './components/AdminDashboard';
-import PlayerDirectory from './components/PlayerDirectory';
-import LiveAuction from './components/LiveAuction';
-import TeamSquads from './components/TeamSquads';
-import UserProfile from './components/UserProfile';
-import Navbar from './components/Navbar';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase';
 import type { User } from '@supabase/supabase-js';
-import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 
+// Each screen is a separate chunk: a bidder never downloads the admin console.
+// Keeping every screen out of the entry also keeps the animation library out of
+// it, so the entry can run the session check while the rest still downloads.
+const loadLanding = () => import('./components/LandingScreen');
+const LandingScreen = lazy(loadLanding);
+// Warm the landing chunk immediately — a logged-out visitor needs it the moment
+// the session check comes back empty.
+loadLanding();
+
+// Navbar shows only once a screen is up, and shares the animation library with
+// it, so deferring it keeps that library out of the entry at no extra cost.
+const Navbar = lazy(() => import('./components/Navbar'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const PlayerDirectory = lazy(() => import('./components/PlayerDirectory'));
+const LiveAuction = lazy(() => import('./components/LiveAuction'));
+const TeamSquads = lazy(() => import('./components/TeamSquads'));
+const UserProfile = lazy(() => import('./components/UserProfile'));
+
 type Screen = 'landing' | 'admin' | 'directory' | 'auction' | 'watchlist' | 'team' | 'profile';
+
+const Spinner = () => (
+  <div className="min-h-screen bg-base flex items-center justify-center">
+    <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
+  </div>
+);
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('landing');
@@ -100,11 +116,7 @@ export default function App() {
   }
 
   const renderScreen = () => {
-    if (loading) return (
-      <div className="min-h-screen bg-base flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
-      </div>
-    );
+    if (loading) return <Spinner />;
 
     if (!user) return <LandingScreen onLogin={() => setCurrentScreen('directory')} />;
 
@@ -135,33 +147,28 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen">
-      <AnimatePresence>
-        {announcement && (
-          <motion.div
-            initial={{ y: -60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -60, opacity: 0 }}
-            className="fixed top-4 left-0 right-0 z-[200] max-w-lg mx-auto px-4"
-          >
-             <div className="bg-accent text-accent-ink px-5 py-3.5 rounded-xl flex items-center justify-between gap-4 shadow-xl">
-                <p className="text-sm font-medium truncate">{announcement.message}</p>
-                <button
-                  onClick={() => setAnnouncement(null)}
-                  className="p-1 hover:bg-black/10 rounded-full transition-colors flex-shrink-0"
-                >
-                   <X className="w-4 h-4" />
-                </button>
-             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {renderScreen()}
+      {announcement && (
+        <div className="banner-drop fixed top-4 left-0 right-0 z-[200] max-w-lg mx-auto px-4">
+          <div className="bg-accent text-accent-ink px-5 py-3.5 rounded-xl flex items-center justify-between gap-4 shadow-xl">
+            <p className="text-sm font-medium truncate">{announcement.message}</p>
+            <button
+              onClick={() => setAnnouncement(null)}
+              className="p-1 hover:bg-black/10 rounded-full transition-colors flex-shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      <Suspense fallback={<Spinner />}>{renderScreen()}</Suspense>
       {currentScreen !== 'landing' && user && (
-        <Navbar 
-          currentScreen={currentScreen} 
-          setCurrentScreen={(s: Screen) => setCurrentScreen(s)} 
-          isAdmin={isAdmin}
-        />
+        <Suspense fallback={null}>
+          <Navbar
+            currentScreen={currentScreen}
+            setCurrentScreen={(s: Screen) => setCurrentScreen(s)}
+            isAdmin={isAdmin}
+          />
+        </Suspense>
       )}
     </div>
   );

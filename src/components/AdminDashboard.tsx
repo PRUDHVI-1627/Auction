@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import {
   Play, Pause, SkipForward, RotateCcw, Megaphone,
@@ -28,6 +28,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [editSaleTeamId, setEditSaleTeamId] = useState<string>('');
   const [editSalePrice, setEditSalePrice] = useState<string>('');
   const unsoldCount = finishedPlayers.filter((player) => player.status === 'UNSOLD').length;
+  // Read inside realtime handlers via a ref: keeping the id in the effect's
+  // dependencies rebuilt the subscription and re-ran initAdmin() — six queries —
+  // every time the admin spotlighted a different player.
+  const activePlayerRef = useRef<any>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { activePlayerRef.current = activePlayer; }, [activePlayer]);
 
   useEffect(() => {
     initAdmin();
@@ -45,14 +52,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, (payload: any) => {
-        if (activePlayer && payload.new.player_id === activePlayer.id) {
+        if (activePlayerRef.current && payload.new.player_id === activePlayerRef.current.id) {
           fetchBids(payload.new.player_id);
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players' }, (payload: any) => {
-        if (activePlayer && payload.new.id === activePlayer.id) setActivePlayer(payload.new);
+        if (activePlayerRef.current && payload.new.id === activePlayerRef.current.id) setActivePlayer(payload.new);
         if (payload.new.status === 'UPCOMING' || payload.new.status === 'SOLD' || payload.new.status === 'UNSOLD') {
-          setTimeout(() => {
+          // Coalesce the burst of row updates a sale produces into one refresh.
+          if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+          refreshTimerRef.current = setTimeout(() => {
+            refreshTimerRef.current = null;
             fetchUpcoming();
             fetchFinished();
           }, 500);
@@ -60,8 +70,11 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(sub); };
-  }, [activePlayer?.id]);
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(sub);
+    };
+  }, []);
 
   async function getAuthHeaders(): Promise<HeadersInit> {
     const { data: { session } } = await supabase.auth.getSession();
