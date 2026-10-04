@@ -8,18 +8,26 @@ export async function placeBid({ playerId, teamId, amount, increment_used, userI
   userId: string;
   isOverride?: boolean;
 }) {
-  const { data: team, error: teamErr } = await supabaseAdmin
-    .from('teams')
-    .select('total_budget, points_spent')
-    .eq('id', teamId)
-    .single();
+  // Independent reads run in parallel: the database round trip dominates latency.
+  const [teamRes, session, playerRes, leadingRes] = await Promise.all([
+    supabaseAdmin.from('teams').select('total_budget, points_spent').eq('id', teamId).single(),
+    getAuctionSessionRecord(),
+    supabaseAdmin.from('players').select('id, status, base_price').eq('id', playerId).single(),
+    supabaseAdmin
+      .from('bids')
+      .select('amount, team_id')
+      .eq('player_id', playerId)
+      .eq('is_undone', false)
+      .order('amount', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
+  const { data: team, error: teamErr } = teamRes;
   if (teamErr || !team) throw new Error('Team not found');
   const pointsRemaining = (team.total_budget ?? 0) - (team.points_spent ?? 0);
 
   if (!isOverride && pointsRemaining < amount) throw new Error('Insufficient points in budget');
-
-  const session = await getAuctionSessionRecord();
 
   if (session.status !== 'LIVE' || session.current_player_id !== playerId) {
     throw new Error('This player is not currently available for bidding');
@@ -29,24 +37,11 @@ export async function placeBid({ playerId, teamId, amount, increment_used, userI
     throw new Error('Bidding has closed for this player');
   }
 
-  const { data: player, error: playerErr } = await supabaseAdmin
-    .from('players')
-    .select('id, status, base_price')
-    .eq('id', playerId)
-    .single();
-
+  const { data: player, error: playerErr } = playerRes;
   if (playerErr || !player) throw new Error('Player records could not be fetched');
   if (player.status !== 'LIVE') throw new Error('This player is not open for bidding');
 
-  const { data: leadingBid, error: leadingBidErr } = await supabaseAdmin
-    .from('bids')
-    .select('amount, team_id')
-    .eq('player_id', playerId)
-    .eq('is_undone', false)
-    .order('amount', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
+  const { data: leadingBid, error: leadingBidErr } = leadingRes;
   if (leadingBidErr) {
     throw new Error(leadingBidErr.message);
   }
