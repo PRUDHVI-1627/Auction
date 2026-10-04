@@ -393,7 +393,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         headers: await getAuthHeaders(),
       });
 
-      if (!response.ok) throw new Error(`Reset failed with ${response.status}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || `Reset failed with ${response.status}`);
+      }
 
       window.location.reload();
     } catch (err: any) {
