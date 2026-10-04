@@ -6,6 +6,22 @@ import { defineConfig } from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          // Keep the rarely-changing vendor code in its own long-lived chunks so a
+          // deploy that only touches app code does not re-download React or motion.
+          // Matching on the resolved path catches react-dom/client and scheduler,
+          // which the bare-specifier form leaves in the entry chunk.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+            if (id.includes('node_modules/motion') || id.includes('node_modules/framer-motion')) return 'motion';
+            if (id.includes('node_modules/@supabase')) return 'supabase';
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

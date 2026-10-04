@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Wallet, Users, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -13,15 +13,41 @@ export default function TeamSquads({ user }: TeamSquadsProps) {
   const [players, setPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     fetchData();
+    // One sale touches both tables; coalesce so it costs one pair of queries.
+    const scheduleFetch = () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        fetchData();
+      }, 400);
+    };
     const channel = supabase
       .channel('roster-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, scheduleFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, scheduleFetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  // Group once per data change instead of scanning the whole roster per team
+  // on every render.
+  const playersByTeam = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const p of players) {
+      if (!p.sold_to_team_id) continue;
+      const list = map.get(p.sold_to_team_id);
+      if (list) list.push(p);
+      else map.set(p.sold_to_team_id, [p]);
+    }
+    return map;
+  }, [players]);
 
   async function fetchData() {
     const { data: teamData } = await supabase.from('teams').select('*').order('name', { ascending: true });
@@ -105,7 +131,7 @@ export default function TeamSquads({ user }: TeamSquadsProps) {
       <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 py-8">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {teams.map((team, idx) => {
-            const teamPlayers = players.filter(p => p.sold_to_team_id === team.id);
+            const teamPlayers = playersByTeam.get(team.id) || [];
             const budgetUsed = teamPlayers.reduce((sum, p) => sum + (p.sold_price || 0), 0);
             const budgetPct = team.total_budget > 0 ? Math.min(100, (budgetUsed / team.total_budget) * 100) : 0;
             const remaining = team.total_budget - budgetUsed;

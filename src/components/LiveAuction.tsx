@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Wallet, Plus, AlertTriangle, X, Users, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -24,8 +24,40 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
   const [sellAnimation, setSellAnimation] = useState<{player: any, type: 'SOLD' | 'UNSOLD'} | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const activePlayerRef = useRef<any>(null);
+  // Realtime handlers read the team through a ref. Holding it in the effect's
+  // dependencies instead would tear down and rebuild the whole subscription
+  // every time initAuction() resolved the team — and re-run initAuction with it.
+  const userTeamIdRef = useRef<string | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { activePlayerRef.current = activePlayer; }, [activePlayer]);
+  useEffect(() => { userTeamIdRef.current = userTeamId; }, [userTeamId]);
+
+  // Recomputed only when the results change, not on every timer tick or bid.
+  const recentDecisions = useMemo(() => finishedPlayers.slice(0, 5), [finishedPlayers]);
+  const topSales = useMemo(
+    () => finishedPlayers
+      .filter(p => p.status === 'SOLD')
+      .sort((a, b) => (b.sold_price || 0) - (a.sold_price || 0))
+      .slice(0, 4),
+    [finishedPlayers]
+  );
+
+  // A single sale fires player, team and bid events back to back. Coalesce them
+  // into one refresh so every client does one round of queries, not five.
+  function scheduleRefresh() {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(async () => {
+      refreshTimerRef.current = null;
+      const teamId = userTeamIdRef.current;
+      fetchFinished(); fetchUpcoming(); fetchAllTeams();
+      if (teamId) {
+        fetchTeamSquad(teamId);
+        const { data: updatedTeam } = await supabase.from('teams').select('*').eq('id', teamId).maybeSingle();
+        if (updatedTeam) setUserTeam(updatedTeam);
+      }
+    }, 500);
+  }
 
   useEffect(() => {
     initAuction();
@@ -42,13 +74,14 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, async (payload: any) => {
+        const teamId = userTeamIdRef.current;
         fetchBids(payload.new.player_id);
-        if (user && userTeamId && payload.new.team_id !== userTeamId) {
+        if (user && teamId && payload.new.team_id !== teamId) {
           const { data: prevBid } = await supabase
             .from('bids').select('team_id')
             .eq('player_id', payload.new.player_id).eq('is_undone', false)
             .order('created_at', { ascending: false }).range(1, 1).maybeSingle();
-          if (prevBid?.team_id === userTeamId) {
+          if (prevBid?.team_id === teamId) {
             setOutbidToast(true);
             setTimeout(() => setOutbidToast(false), 5000);
           }
@@ -56,14 +89,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players' }, async (payload: any) => {
         if (payload.new.status === 'SOLD' || payload.new.status === 'UNSOLD') {
-          setTimeout(async () => {
-            fetchFinished(); fetchUpcoming(); fetchAllTeams();
-            if (userTeamId) {
-              fetchTeamSquad(userTeamId);
-              const { data: updatedTeam } = await supabase.from('teams').select('*').eq('id', userTeamId).maybeSingle();
-              setUserTeam(updatedTeam);
-            }
-          }, 500);
+          scheduleRefresh();
           setSellAnimation({ player: payload.new, type: payload.new.status });
           setTimeout(() => setSellAnimation(null), 4000);
         }
@@ -72,14 +98,18 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, (payload: any) => {
-        if (userTeamId && payload.new.id === userTeamId) {
-          setUserTeam(payload.new); fetchTeamSquad(userTeamId);
+        // The row that changed is already in the payload — no need to re-read it.
+        if (userTeamIdRef.current && payload.new.id === userTeamIdRef.current) {
+          setUserTeam(payload.new);
         }
-        fetchAllTeams();
+        setAllTeams(prev => prev.map(t => (t.id === payload.new.id ? payload.new : t)));
       })
       .subscribe();
-    return () => { supabase.removeChannel(sessionSub); };
-  }, [user, userTeamId]);
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(sessionSub);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!session?.timer_expires_at || session?.status !== 'LIVE') { setTimeLeft(null); return; }
@@ -92,7 +122,12 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
   }, [session?.timer_expires_at, session?.status]);
 
   async function fetchFinished() {
-    const { data } = await supabase.from('players').select('*, teams(*)').or('status.eq.SOLD,status.eq.UNSOLD').order('updated_at', { ascending: false });
+    // Only the columns the two result panels actually render.
+    const { data } = await supabase
+      .from('players')
+      .select('id, name, status, sold_price, updated_at, teams(name)')
+      .in('status', ['SOLD', 'UNSOLD'])
+      .order('updated_at', { ascending: false });
     setFinishedPlayers(data || []);
   }
   async function fetchUpcoming() {
@@ -327,7 +362,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                     <h3 className="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Recent decisions</h3>
                   </div>
                   <div className="p-4 space-y-1">
-                    {finishedPlayers.slice(0, 5).map(p => (
+                    {recentDecisions.map(p => (
                       <div key={p.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0 hover:bg-surface-3/30 rounded transition-colors">
                         <div>
                           <p className="text-sm font-medium text-ink leading-none mb-1">{p.name}</p>
@@ -361,7 +396,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                     <Trophy className="w-3.5 h-3.5 text-gold" />
                   </div>
                   <div className="p-4 space-y-1">
-                    {finishedPlayers.filter(p => p.status === 'SOLD').sort((a, b) => (b.sold_price || 0) - (a.sold_price || 0)).slice(0, 4).map((p, idx) => (
+                    {topSales.map((p, idx) => (
                       <div key={p.id} className="flex justify-between items-center py-2.5 border-b border-border last:border-0 hover:bg-surface-3/30 rounded transition-colors">
                         <div className="flex items-center gap-2.5">
                           <span className={cn("tnum text-xs font-bold w-5 h-5 rounded flex items-center justify-center", idx === 0 ? "bg-gold/20 text-gold" : "bg-surface-2 text-ink-faint")}>{idx + 1}</span>
@@ -373,7 +408,7 @@ export default function LiveAuction({ user }: LiveAuctionProps) {
                         <span className={cn("tnum text-sm font-bold", idx === 0 ? "text-gold" : "text-accent")}>{p.sold_price}</span>
                       </div>
                     ))}
-                    {finishedPlayers.filter(p => p.status === 'SOLD').length === 0 && (
+                    {topSales.length === 0 && (
                       <div className="flex flex-col items-center py-8 gap-2">
                         <Trophy className="w-5 h-5 text-ink-faint" />
                         <p className="text-xs text-ink-faint">No sales yet</p>

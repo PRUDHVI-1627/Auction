@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Anton&display=swap');
+/* Webfonts are linked from index.html so they download in parallel with this
+   stylesheet instead of being discovered only after it arrives. */
 @import "tailwindcss";
 
 @theme {
@@ -159,6 +160,16 @@
   animation: skeleton-pulse 1.8s ease-in-out infinite;
 }
 
+/* Announcement banner — CSS so the entry bundle does not need the motion
+   library just to slide one element in. */
+@keyframes banner-drop {
+  from { transform: translateY(-60px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.banner-drop {
+  animation: banner-drop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Focus visible ring — a11y */
 .focus-ring:focus-visible {
   outline: none;
@@ -171,6 +182,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .banner-drop { animation: none; }
   .ticker-scroll { animation: none; }
   .live-dot { animation: none; }
   .scoreboard-shimmer { animation: none; }
